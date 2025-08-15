@@ -137,10 +137,10 @@ export default function HomePage(props) {
         // Main container with centered, responsive layout
         <main className='flex-1  p-4 flex flex-col gap-3 text-center sm:gap-4  justify-center pb-20'>
             {/* Application title with brand styling */}
-            <h1 className='font-semibold text-5xl sm:text-6xl md:text-7xl'>Audio<span className='text-blue-400 bold'>Bridge</span></h1>
+            <h1 className='font-semibold text-5xl sm:text-6xl md:text-7xl'>Audio<span className='text-blue-400 bold'>Audio</span></h1>
             
             {/* Subtitle describing the app's workflow */}
-            <h3 className='font-medium md:text-lg'>Record <span className='text-blue-400'>&rarr;</span> Transcribe <span className='text-blue-400'>&rarr;</span> Translate</h3>
+            <h3 className='font-medium md:text-lg'>Record <span className='text-blue-400'>&rarr;</span> Textly <span className='text-blue-400'>&rarr;</span> Translate</h3>
             
             {/* Main recording button - toggles between start/stop recording */}
             <button 

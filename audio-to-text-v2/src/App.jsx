@@ -1,6 +1,13 @@
 import React from 'react'
 import React, { useState, useRef, useEffect } from 'react'
 
+//Components
+import HomePage from './components/HomePage'
+import Header from './components/Header'
+import FileDisplay from './components/FileDisplay.jsx'
+import Information from './components/Information'
+import Transcribing from './components/Transcribing'
+import { MessageType } from './utils/presets'
 
 
 function App() {
