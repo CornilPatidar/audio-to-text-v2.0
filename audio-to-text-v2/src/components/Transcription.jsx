@@ -4,6 +4,6 @@ export default function Transcription(props) {
     const { textElement } = props
 
     return (
-        <div>{textElement}</div>
+        <div className="whitespace-pre-line text-left">{textElement}</div>
     )
 }
