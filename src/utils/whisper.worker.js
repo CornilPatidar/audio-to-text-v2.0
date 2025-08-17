@@ -4,19 +4,41 @@ import { MessageTypes } from './presets'
 class MyTranscriptionPipeline {
     static task = 'automatic-speech-recognition'
     static models = [
-        'Xenova/whisper-small.en',  // Better for structured content
-        'onnx-community/whisper-small.en',
-        'Xenova/whisper-tiny.en',   // Fallback options
+        'Xenova/whisper-tiny.en',   // Fast loading ~39MB - prioritize for speed
         'onnx-community/whisper-tiny.en',
+        'Xenova/whisper-small.en',  // Better accuracy ~240MB - secondary option
+        'onnx-community/whisper-small.en',
         'microsoft/whisper-tiny.en',
         'openai/whisper-tiny.en'
     ]
     static instance = null
     static currentModelIndex = 0
+    
+    // Progress tracking for unified 0-100% progression
+    static progressTracker = {
+        totalFiles: 0,
+        completedFiles: 0,
+        currentFileProgress: 0,
+        reset() {
+            this.totalFiles = 0
+            this.completedFiles = 0
+            this.currentFileProgress = 0
+        },
+        getOverallProgress() {
+            if (this.totalFiles === 0) return 0
+            const fileWeight = 1 / this.totalFiles
+            const completedProgress = this.completedFiles * fileWeight
+            const currentProgress = this.currentFileProgress * fileWeight
+            return Math.min(100, (completedProgress + currentProgress) * 100)
+        }
+    }
 
     static async getInstance(progress_callback = null) {
         if (this.instance === null) {
             let lastError = null
+            
+            // Reset progress tracker for new loading session
+            this.progressTracker.reset()
             
             // Try each model in sequence until one works
             for (let i = this.currentModelIndex; i < this.models.length; i++) {
@@ -24,14 +46,30 @@ class MyTranscriptionPipeline {
                 console.log(`🔄 [WORKER] Trying model ${i + 1}/${this.models.length}:`, model)
                 
                 try {
-                    this.instance = await pipeline(this.task, model, {
+                    // First try to load from cache with WebGPU
+                    let pipelineConfig = {
                         progress_callback,
                         dtype: 'fp32',
-                        // Add additional configuration for better compatibility
+                        // Enhanced caching configuration
                         revision: 'main',
                         cache_dir: './models',
-                        local_files_only: false
-                    })
+                        local_files_only: false,
+                        // Browser caching optimizations
+                        use_cache: true,
+                        cache_timeout: 86400000, // 24 hours in milliseconds
+                        // Performance optimizations
+                        use_external_data_format: false  // Keep model data inline for better caching
+                    }
+                    
+                    // Try WebGPU first, fallback to CPU if not available
+                    try {
+                        pipelineConfig.device = 'webgpu'
+                        this.instance = await pipeline(this.task, model, pipelineConfig)
+                    } catch (webgpuError) {
+                        console.warn(`⚠️ [WORKER] WebGPU not available for ${model}, falling back to CPU:`, webgpuError.message)
+                        pipelineConfig.device = 'cpu'
+                        this.instance = await pipeline(this.task, model, pipelineConfig)
+                    }
                     
                     console.log('✅ [WORKER] Successfully loaded model:', model)
                     this.currentModelIndex = i
@@ -101,10 +139,10 @@ async function transcribe(audio) {
         duration: `${(audio.length / 16000).toFixed(2)}s`
     })
     
-    // Add small padding to ensure complete processing
-    const paddedAudio = new Float32Array(audio.length + 3200) // 0.2s padding
-    paddedAudio.set(audio, 1600) // 0.1s offset
-    console.log('🔍 [WORKER] Added padding for complete processing')
+    // Add minimal padding to ensure complete processing while maximizing speed
+    const paddedAudio = new Float32Array(audio.length + 1600) // 0.1s padding (reduced from 0.2s)
+    paddedAudio.set(audio, 800) // 0.05s offset (reduced from 0.1s)
+    console.log('🔍 [WORKER] Added minimal padding for faster processing')
     
     sendLoadingMessage('loading')
 
@@ -156,7 +194,7 @@ async function transcribe(audio) {
     console.log('🎉 [WORKER] Starting transcription...')
     sendLoadingMessage('success')
 
-    const stride_length_s = 2  // Reduced for better overlap
+    const stride_length_s = 1  // Further reduced for faster processing and better overlap
     const audioLength = Math.round(paddedAudio.length / 16000)
     console.log(`⚙️ [WORKER] Processing ${audioLength}s of padded audio...`)
 
@@ -164,8 +202,12 @@ async function transcribe(audio) {
         const generationTracker = new GenerationTracker(pipeline, stride_length_s)
         console.log('🔄 [WORKER] Running speech recognition...')
         
-        // Optimized settings for educational/structured content
-        const result = await pipeline(paddedAudio, {
+        // Detect if we're using an English-only model
+        const currentModel = MyTranscriptionPipeline.models[MyTranscriptionPipeline.currentModelIndex]
+        const isEnglishOnlyModel = currentModel.includes('.en')
+        
+        // Base configuration for all models
+        const baseConfig = {
             // Core settings
             return_timestamps: true,
             
@@ -174,22 +216,32 @@ async function transcribe(audio) {
             top_k: 0,
             temperature: 0.0,
             
-            // Chunk processing - longer chunks with smaller stride for better coverage
-            chunk_length_s: 60,  // Increased for longer content
-            stride_length_s: stride_length_s,  // Reduced for better overlap
+            // Chunk processing - optimized for faster processing and better overlap
+            chunk_length_s: 30,  // Reduced for faster processing and to avoid 30s warning
+            stride_length_s: stride_length_s,  // Better overlap
             
             // Enhanced for educational content
             word_timestamps: true,
             suppress_tokens: [-1],
             
-            // Language and formatting
-            language: 'en',
-            task: 'transcribe',
-            
             // Callbacks
             callback_function: generationTracker.callbackFunction.bind(generationTracker),
             chunk_callback: generationTracker.chunkCallback.bind(generationTracker)
-        })
+        }
+        
+        // Add language/task only for multilingual models
+        const config = isEnglishOnlyModel 
+            ? baseConfig 
+            : {
+                ...baseConfig,
+                language: 'en',
+                task: 'transcribe'
+            }
+        
+        console.log(`🎯 [WORKER] Using ${isEnglishOnlyModel ? 'English-only' : 'multilingual'} model config:`, config)
+        
+        // Optimized settings for educational/structured content
+        const result = await pipeline(paddedAudio, config)
         
         console.log('✨ [WORKER] Recognition completed!')
         
@@ -239,23 +291,36 @@ async function transcribe(audio) {
 
 async function load_model_callback(data) {
     const { status } = data
-    if (status === 'progress') {
+    const progressTracker = MyTranscriptionPipeline.progressTracker
+    
+    if (status === 'initiate') {
+        console.log('📦 [WORKER] Initiating download:', data.file)
+        progressTracker.totalFiles++
+    } else if (status === 'download') {
+        console.log('📦 [WORKER] Starting download:', data.file)
+    } else if (status === 'progress') {
         const { file, progress, loaded, total } = data
+        
+        // Update current file progress
+        progressTracker.currentFileProgress = progress
+        
+        // Calculate unified progress (0-100%)
+        const overallProgress = progressTracker.getOverallProgress()
         
         // Detect potential HTML error pages
         const isSuspicious = progress > 10 && total < 10000
         const isLikelyHTML = total < 5000 && file?.includes('.json')
         
         // Only log important download milestones to reduce console spam
-        const progressPercent = (progress * 100)
-        const shouldLog = progressPercent === 0 || progressPercent >= 100 || 
-                         (progressPercent % 25 === 0 && progressPercent <= 100) ||
+        const shouldLog = progress === 0 || progress >= 1 || 
+                         (Math.floor(progress * 20) !== Math.floor((progress - 0.05) * 20)) || // Every 5%
                          isSuspicious || isLikelyHTML
         
         if (shouldLog) {
             console.log('📥 [WORKER] Model download progress:', {
-                file: file,
-                progress: `${progressPercent.toFixed(1)}%`,
+                file: file.split('/').pop(), // Show just filename for cleaner logs
+                fileProgress: `${(progress * 100).toFixed(1)}%`,
+                overallProgress: `${overallProgress.toFixed(1)}%`,
                 loaded: `${(loaded / 1024 / 1024).toFixed(1)} MB`,
                 total: `${(total / 1024 / 1024).toFixed(1)} MB`
             })
@@ -264,19 +329,19 @@ async function load_model_callback(data) {
         // Enhanced detection of HTML error pages
         if (isSuspicious || isLikelyHTML) {
             console.warn('⚠️ [WORKER] Suspicious download detected - likely receiving HTML error pages instead of model files')
-            console.warn('   This usually indicates:')
-            console.warn('   - Model repository not found (404)')
-            console.warn('   - Network/CORS issues')
-            console.warn('   - Hugging Face CDN problems')
         }
         
-        sendDownloadingMessage(file, progress, loaded, total)
-    } else if (status === 'initiate') {
-        console.log('📦 [WORKER] Initiating download:', data.file)
-    } else if (status === 'download') {
-        console.log('📦 [WORKER] Starting download:', data.file)
+        // Send unified progress to UI
+        sendDownloadingMessage(file, overallProgress / 100, loaded, total, overallProgress)
+        
     } else if (status === 'done') {
         console.log('✅ [WORKER] Downloaded:', data.file)
+        progressTracker.completedFiles++
+        progressTracker.currentFileProgress = 0
+        
+        // Send updated progress
+        const overallProgress = progressTracker.getOverallProgress()
+        sendDownloadingMessage(data.file, overallProgress / 100, 0, 0, overallProgress)
     }
 }
 
@@ -289,13 +354,14 @@ function sendLoadingMessage(status, error = null, details = null) {
     })
 }
 
-async function sendDownloadingMessage(file, progress, loaded, total) {
+async function sendDownloadingMessage(file, progress, loaded, total, overallProgress = null) {
     self.postMessage({
         type: MessageTypes.DOWNLOADING,
         file,
-        progress,
+        progress, // This is now the unified 0-1 progress
         loaded,
-        total
+        total,
+        progressPercent: overallProgress || (progress * 100) // Clean 0-100% for UI display
     })
 }
 
