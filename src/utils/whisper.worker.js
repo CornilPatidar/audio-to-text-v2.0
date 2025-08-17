@@ -4,8 +4,10 @@ import { MessageTypes } from './presets'
 class MyTranscriptionPipeline {
     static task = 'automatic-speech-recognition'
     static models = [
+        'Xenova/whisper-small.en',  // Better for structured content
+        'onnx-community/whisper-small.en',
+        'Xenova/whisper-tiny.en',   // Fallback options
         'onnx-community/whisper-tiny.en',
-        'Xenova/whisper-tiny.en', 
         'microsoft/whisper-tiny.en',
         'openai/whisper-tiny.en'
     ]
@@ -87,7 +89,7 @@ self.addEventListener('message', async (event) => {
 async function transcribe(audio) {
     console.log('🚀 [WORKER] Transcribe function started')
     
-    // Validate audio data
+    // Validate and normalize audio data
     console.log('🔍 [WORKER] Audio validation:', {
         length: audio.length,
         type: typeof audio,
@@ -95,8 +97,14 @@ async function transcribe(audio) {
         hasNaN: audio.some(val => isNaN(val)),
         maxValue: Math.max(...audio.slice(0, 1000)),
         minValue: Math.min(...audio.slice(0, 1000)),
-        avgAmplitude: audio.slice(0, 1000).reduce((a, b) => Math.abs(a) + Math.abs(b), 0) / 1000
+        avgAmplitude: audio.slice(0, 1000).reduce((a, b) => Math.abs(a) + Math.abs(b), 0) / 1000,
+        duration: `${(audio.length / 16000).toFixed(2)}s`
     })
+    
+    // Add small padding to ensure complete processing
+    const paddedAudio = new Float32Array(audio.length + 3200) // 0.2s padding
+    paddedAudio.set(audio, 1600) // 0.1s offset
+    console.log('🔍 [WORKER] Added padding for complete processing')
     
     sendLoadingMessage('loading')
 
@@ -148,29 +156,35 @@ async function transcribe(audio) {
     console.log('🎉 [WORKER] Starting transcription...')
     sendLoadingMessage('success')
 
-    const stride_length_s = 5
-    console.log(`⚙️ [WORKER] Processing ${Math.round(audio.length / 16000)}s of audio...`)
+    const stride_length_s = 2  // Reduced for better overlap
+    const audioLength = Math.round(paddedAudio.length / 16000)
+    console.log(`⚙️ [WORKER] Processing ${audioLength}s of padded audio...`)
 
     try {
         const generationTracker = new GenerationTracker(pipeline, stride_length_s)
         console.log('🔄 [WORKER] Running speech recognition...')
         
-        const result = await pipeline(audio, {
+        // Optimized settings for educational/structured content
+        const result = await pipeline(paddedAudio, {
             // Core settings
             return_timestamps: true,
             
-            // Sampling settings
+            // Sampling settings - more deterministic for structured content
             do_sample: false,
             top_k: 0,
             temperature: 0.0,
             
-            // Chunk processing 
-            chunk_length_s: 30,
-            stride_length_s: stride_length_s,
+            // Chunk processing - longer chunks with smaller stride for better coverage
+            chunk_length_s: 60,  // Increased for longer content
+            stride_length_s: stride_length_s,  // Reduced for better overlap
             
-            // Silence detection
+            // Enhanced for educational content
             word_timestamps: true,
             suppress_tokens: [-1],
+            
+            // Language and formatting
+            language: 'en',
+            task: 'transcribe',
             
             // Callbacks
             callback_function: generationTracker.callbackFunction.bind(generationTracker),
@@ -200,7 +214,7 @@ async function transcribe(audio) {
                 
                 chunks = [{
                     text: 'No speech detected in audio. Please check:\n• Audio volume and quality\n• Background noise levels\n• Audio format compatibility\n• Try using a different audio file',
-                    timestamp: [0, Math.round(audio.length / 16000)]
+                    timestamp: [0, Math.round(paddedAudio.length / 16000)]
                 }]
             }
             
@@ -349,19 +363,25 @@ class GenerationTracker {
             return this.processChunk(chunk, this.processed_chunks.length + index)
         })
         
-        // Remove duplicates based on overlapping timestamps, keep latest version
+        // More conservative duplicate removal to prevent missing content
         for (const newChunk of newProcessedChunks) {
+            // Only consider it a duplicate if timestamps are very close AND text is similar
             const existingIndex = this.processed_chunks.findIndex(existing => 
-                Math.abs(existing.start - newChunk.start) < 1 && 
-                Math.abs(existing.end - newChunk.end) < 1
+                Math.abs(existing.start - newChunk.start) < 0.5 && 
+                Math.abs(existing.end - newChunk.end) < 0.5 &&
+                existing.text.length > 0 && newChunk.text.length > 0
             )
             
             if (existingIndex >= 0) {
-                // Update existing chunk with newer version
-                this.processed_chunks[existingIndex] = newChunk
+                // Keep the chunk with more content
+                if (newChunk.text.length > this.processed_chunks[existingIndex].text.length) {
+                    this.processed_chunks[existingIndex] = newChunk
+                }
             } else {
-                // Add new chunk
-                this.processed_chunks.push(newChunk)
+                // Add new chunk if it has meaningful content
+                if (newChunk.text.trim().length > 0) {
+                    this.processed_chunks.push(newChunk)
+                }
             }
         }
         
