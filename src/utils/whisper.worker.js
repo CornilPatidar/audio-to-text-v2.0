@@ -74,11 +74,11 @@ class MyTranscriptionPipeline {
                     // Try WebGPU first, fallback to CPU if not available
                     try {
                         pipelineConfig.device = 'webgpu'
-                        this.instance = await pipeline(this.task, model, pipelineConfig)
+                        this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
                     } catch (webgpuError) {
                         console.warn(`⚠️ [WORKER] WebGPU not available for ${model}, falling back to CPU:`, webgpuError.message)
                         pipelineConfig.device = 'cpu'
-                        this.instance = await pipeline(this.task, model, pipelineConfig)
+                        this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
                     }
                     
                     console.log('✅ [WORKER] Successfully loaded model:', model)
@@ -114,6 +114,12 @@ class MyTranscriptionPipeline {
         return this.instance
     }
 }
+        async function safePipelineLoad(task, model, config, timeout = 20000) {
+            return Promise.race([
+            pipeline(task, model, config),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("⏳ Model load timeout after 20s")), timeout))
+            ])
+        }
 
 self.addEventListener('message', async (event) => {
     // Verify the message origin for security
@@ -133,7 +139,10 @@ self.addEventListener('message', async (event) => {
         await transcribe(audio)
     }
 })
-
+function hasSpeech(audio) {
+    const rms = Math.sqrt(audio.reduce((sum, v) => sum + v*v, 0) / audio.length)
+    return rms > 0.005   // adjust threshold if needed
+  }
 async function transcribe(audio) {
     console.log('🚀 [WORKER] Transcribe function started')
     
@@ -274,10 +283,14 @@ async function transcribe(audio) {
                 // No transcribable content found - create helpful message
                 console.log('⚠️ [WORKER] No speech detected in audio')
                 
-                chunks = [{
-                    text: 'No speech detected in audio. Please check:\n• Audio volume and quality\n• Background noise levels\n• Audio format compatibility\n• Try using a different audio file',
-                    timestamp: [0, Math.round(paddedAudio.length / 16000)]
-                }]
+                if (!hasSpeech(paddedAudio)) {
+                    chunks = [{
+                        text: "⚠️ No clear speech detected. Please check volume/noise.",
+                        timestamp: [0, Math.round(paddedAudio.length / 16000)]
+                    }]
+                } else {
+                    chunks = [result] // keep Whisper’s raw output if audio has energy
+                }
             }
             
             generationTracker.processed_chunks = chunks.map((chunk, index) => {
@@ -457,12 +470,11 @@ class GenerationTracker {
             )
             
             if (existingIndex >= 0) {
-                // Keep the chunk with more content
-                if (newChunk.text.length > this.processed_chunks[existingIndex].text.length) {
+                const isSimilar = newChunk.text.toLowerCase() === this.processed_chunks[existingIndex].text.toLowerCase()
+                if (!isSimilar && newChunk.text.length > this.processed_chunks[existingIndex].text.length) {
                     this.processed_chunks[existingIndex] = newChunk
                 }
             } else {
-                // Add new chunk if it has meaningful content
                 if (newChunk.text.trim().length > 0) {
                     this.processed_chunks.push(newChunk)
                 }
