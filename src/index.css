@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  background-color: #ffffff !important;
+}
 
 * {
     font-family: "Open Sans", sans-serif;
