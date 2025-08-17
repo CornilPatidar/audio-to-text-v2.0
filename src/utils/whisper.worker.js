@@ -305,9 +305,9 @@ async function load_model_callback(data) {
     
     if (status === 'initiate') {
         console.log('📦 [WORKER] Initiating download:', data.file)
-        // Add total file size to tracker when download starts
-        if (data.total) {
-            progressTracker.updateTotal(data.total)
+        // Register file size when download initiates
+        if (data.file && data.total) {
+            progressTracker.updateTotal(data.file, data.total)
         }
     } else if (status === 'download') {
         console.log('📦 [WORKER] Starting download:', data.file)
@@ -318,8 +318,13 @@ async function load_model_callback(data) {
         const isSuspicious = progress > 10 && total < 10000
         const isLikelyHTML = total < 5000 && file?.includes('.json')
         
+        // Register file size if we haven't seen it before (fallback)
+        if (file && total && !progressTracker.fileProgress.has(file)) {
+            progressTracker.updateTotal(file, total)
+        }
+        
         // Calculate unified progress across all files
-        const overallProgress = progressTracker.updateProgress(progressTracker.downloadedBytes + loaded)
+        const overallProgress = progressTracker.updateFileProgress(file, loaded)
         
         // Only log important download milestones to reduce console spam
         const shouldLog = overallProgress === 0 || overallProgress >= 100 || 
@@ -349,13 +354,12 @@ async function load_model_callback(data) {
         sendDownloadingMessage(file, overallProgress, loaded, total)
     } else if (status === 'done') {
         console.log('✅ [WORKER] Downloaded:', data.file)
-        // Add this file's bytes to downloaded total
-        if (data.total) {
-            progressTracker.downloadedBytes += data.total
+        // Mark file as complete and calculate final progress
+        if (data.file && progressTracker.fileProgress.has(data.file)) {
+            const fileData = progressTracker.fileProgress.get(data.file)
+            const overallProgress = progressTracker.updateFileProgress(data.file, fileData.total)
+            sendDownloadingMessage(data.file, overallProgress, fileData.total, fileData.total)
         }
-        // Send 100% progress for this completion
-        const overallProgress = progressTracker.updateProgress(progressTracker.downloadedBytes)
-        sendDownloadingMessage(data.file, overallProgress, data.total || 0, data.total || 0)
     }
 }
 
