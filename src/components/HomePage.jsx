@@ -4,12 +4,9 @@ export default function HomePage(props) {
     const { setAudioStream, setFile } = props
 
     const [recordingStatus, setRecordingStatus] = useState('inactive')
-    const [audioChunks, setAudioChunks] = useState([])
     const [duration, setDuration] = useState(0)
 
     const mediaRecorder = useRef(null)
-
-    const mimeType = 'audio/webm'
 
     async function startRecording() {
         let tempStream
@@ -17,40 +14,79 @@ export default function HomePage(props) {
 
         try {
             const streamData = await navigator.mediaDevices.getUserMedia({
-                audio: true,
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                },
                 video: false
             })
             tempStream = streamData
         } catch (err) {
-            console.log(err.message)
+            console.error('Microphone access error:', err.message)
+            
+            let errorMessage = 'Unable to access microphone. '
+            if (err.name === 'NotAllowedError') {
+                errorMessage += 'Please allow microphone access and try again.'
+            } else if (err.name === 'NotFoundError') {
+                errorMessage += 'No microphone found. Please check your audio devices.'
+            } else {
+                errorMessage += 'Please check your microphone permissions and try again.'
+            }
+            
+            alert(errorMessage)
             return
         }
+        
         setRecordingStatus('recording')
 
+        // Try different mime types for better compatibility
+        let options = { mimeType: 'audio/webm' }
+        if (!MediaRecorder.isTypeSupported('audio/webm')) {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                options = { mimeType: 'audio/mp4' }
+            } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                options = { mimeType: 'audio/wav' }
+            } else {
+                options = {} // Use default
+            }
+        }
+
         //create new Media recorder instance
-        const media = new MediaRecorder(tempStream, { type: mimeType })
+        const media = new MediaRecorder(tempStream, options)
         mediaRecorder.current = media
 
-        mediaRecorder.current.start()
-        let localAudioChunks = []
+        // Store audio chunks in ref to avoid state closure issues
+        const chunks = []
+        
         mediaRecorder.current.ondataavailable = (event) => {
             if (typeof event.data === 'undefined') { return }
             if (event.data.size === 0) { return }
-            localAudioChunks.push(event.data)
+            console.log('Audio chunk received:', event.data.size, 'bytes')
+            chunks.push(event.data)
         }
-        setAudioChunks(localAudioChunks)
+
+        mediaRecorder.current.onstop = () => {
+            console.log('Recording stopped, creating blob with', chunks.length, 'chunks')
+            const audioBlob = new Blob(chunks, { type: options.mimeType || 'audio/webm' })
+            console.log('Audio blob created:', audioBlob.size, 'bytes')
+            setAudioStream(audioBlob)
+            setDuration(0)
+            
+            // Stop all tracks to release microphone
+            tempStream.getTracks().forEach(track => track.stop())
+        }
+
+        mediaRecorder.current.start(100) // Collect data every 100ms
     }
 
     async function stopRecording() {
         setRecordingStatus('inactive')
         console.log('Stop recording')
 
-        mediaRecorder.current.stop()
-        mediaRecorder.current.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: mimeType })
-            setAudioStream(audioBlob)
-            setAudioChunks([])
-            setDuration(0)
+        if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
+            mediaRecorder.current.stop()
         }
     }
 
@@ -75,9 +111,12 @@ export default function HomePage(props) {
                     {duration !== 0 && (
                         <p className='text-sm'>{duration}s</p>
                     )} 
-                    <i className={"fa-solid duration-200 fa-microphone " + (recordingStatus === 'recording' ? ' text-rose-300' : "")}></i>
+                    <i className={"fa-solid duration-200 fa-microphone " + (recordingStatus === 'recording' ? ' text-rose-300 animate-pulse' : "")}></i>
                 </div>
             </button>
+            {recordingStatus === 'recording' && (
+                <p className='text-sm text-red-500 animate-pulse'>🔴 Recording... Speak clearly into your microphone</p>
+            )}
             <p className='text-base'>Or <label className='text-red-400 cursor-pointer hover:text-red-600 duration-200'>Upload <input onChange={(e) => {
                 const tempFile = e.target.files[0]
                 setFile(tempFile)
