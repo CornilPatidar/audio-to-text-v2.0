@@ -25,10 +25,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "src/utils/*.worker.js": {
-      "includeFiles": "src/utils/*.js"
-    }
-  }
+  ]
 }
