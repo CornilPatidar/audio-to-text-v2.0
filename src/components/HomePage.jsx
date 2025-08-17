@@ -104,7 +104,7 @@ export default function HomePage(props) {
     return (
         <main className='flex-1  p-4 flex flex-col gap-3 text-center sm:gap-4  justify-center pb-20'>
             <h1 className='font-semibold text-5xl sm:text-6xl md:text-7xl'>Audio<span className='text-red-400 bold'>Textly</span></h1>
-            <h3 className='font-medium md:text-lg'>Record <span className='text-red-400'>&rarr;</span> Transcribe <span className='text-red-400'>&rarr;</span> Translate</h3>
+            <h3 className='font-medium md:text-lg'>Record or Upload <span className='text-red-400'>&rarr;</span> Transcribe</h3>
             <button onClick={recordingStatus === 'recording' ? stopRecording : startRecording} className='flex specialBtn px-4 py-2 rounded-xl items-center text-base justify-between gap-4 mx-auto w-72 max-w-full my-4'>
                 <p className='text-red-400'>{recordingStatus === 'inactive' ? 'Record' : `Stop recording`}</p>
                 <div className='flex items-center gap-2'>
