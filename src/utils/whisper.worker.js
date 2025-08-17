@@ -14,22 +14,32 @@ class MyTranscriptionPipeline {
     static instance = null
     static currentModelIndex = 0
     
-    // Progress tracking for unified 0-100% progression
+    // Simple unified progress tracking
     static progressTracker = {
-        totalFiles: 0,
-        completedFiles: 0,
-        currentFileProgress: 0,
+        totalBytes: 0,
+        downloadedBytes: 0,
+        fileProgress: new Map(), // Track individual file progress
         reset() {
-            this.totalFiles = 0
-            this.completedFiles = 0
-            this.currentFileProgress = 0
+            this.totalBytes = 0
+            this.downloadedBytes = 0
+            this.fileProgress.clear()
         },
-        getOverallProgress() {
-            if (this.totalFiles === 0) return 0
-            const fileWeight = 1 / this.totalFiles
-            const completedProgress = this.completedFiles * fileWeight
-            const currentProgress = this.currentFileProgress * fileWeight
-            return Math.min(100, (completedProgress + currentProgress) * 100)
+        updateTotal(fileName, fileSize) {
+            if (!this.fileProgress.has(fileName)) {
+                this.totalBytes += fileSize
+                this.fileProgress.set(fileName, { total: fileSize, loaded: 0 })
+            }
+        },
+        updateFileProgress(fileName, loaded) {
+            if (this.fileProgress.has(fileName)) {
+                this.fileProgress.get(fileName).loaded = loaded
+            }
+            // Calculate total progress across all files
+            let totalLoaded = 0
+            for (const fileData of this.fileProgress.values()) {
+                totalLoaded += fileData.loaded
+            }
+            return this.totalBytes > 0 ? Math.min(100, (totalLoaded / this.totalBytes) * 100) : 0
         }
     }
 
@@ -295,30 +305,30 @@ async function load_model_callback(data) {
     
     if (status === 'initiate') {
         console.log('📦 [WORKER] Initiating download:', data.file)
-        progressTracker.totalFiles++
+        // Add total file size to tracker when download starts
+        if (data.total) {
+            progressTracker.updateTotal(data.total)
+        }
     } else if (status === 'download') {
         console.log('📦 [WORKER] Starting download:', data.file)
     } else if (status === 'progress') {
         const { file, progress, loaded, total } = data
         
-        // Update current file progress
-        progressTracker.currentFileProgress = progress
-        
-        // Calculate unified progress (0-100%)
-        const overallProgress = progressTracker.getOverallProgress()
-        
         // Detect potential HTML error pages
         const isSuspicious = progress > 10 && total < 10000
         const isLikelyHTML = total < 5000 && file?.includes('.json')
         
+        // Calculate unified progress across all files
+        const overallProgress = progressTracker.updateProgress(progressTracker.downloadedBytes + loaded)
+        
         // Only log important download milestones to reduce console spam
-        const shouldLog = progress === 0 || progress >= 1 || 
-                         (Math.floor(progress * 20) !== Math.floor((progress - 0.05) * 20)) || // Every 5%
+        const shouldLog = overallProgress === 0 || overallProgress >= 100 || 
+                         (Math.floor(overallProgress) % 25 === 0) ||
                          isSuspicious || isLikelyHTML
         
         if (shouldLog) {
             console.log('📥 [WORKER] Model download progress:', {
-                file: file.split('/').pop(), // Show just filename for cleaner logs
+                file: file.split('/').pop(), // Show just filename
                 fileProgress: `${(progress * 100).toFixed(1)}%`,
                 overallProgress: `${overallProgress.toFixed(1)}%`,
                 loaded: `${(loaded / 1024 / 1024).toFixed(1)} MB`,
@@ -329,19 +339,23 @@ async function load_model_callback(data) {
         // Enhanced detection of HTML error pages
         if (isSuspicious || isLikelyHTML) {
             console.warn('⚠️ [WORKER] Suspicious download detected - likely receiving HTML error pages instead of model files')
+            console.warn('   This usually indicates:')
+            console.warn('   - Model repository not found (404)')
+            console.warn('   - Network/CORS issues')
+            console.warn('   - Hugging Face CDN problems')
         }
         
-        // Send unified progress to UI
-        sendDownloadingMessage(file, overallProgress / 100, loaded, total, overallProgress)
-        
+        // Send unified progress (0-100%)
+        sendDownloadingMessage(file, overallProgress, loaded, total)
     } else if (status === 'done') {
         console.log('✅ [WORKER] Downloaded:', data.file)
-        progressTracker.completedFiles++
-        progressTracker.currentFileProgress = 0
-        
-        // Send updated progress
-        const overallProgress = progressTracker.getOverallProgress()
-        sendDownloadingMessage(data.file, overallProgress / 100, 0, 0, overallProgress)
+        // Add this file's bytes to downloaded total
+        if (data.total) {
+            progressTracker.downloadedBytes += data.total
+        }
+        // Send 100% progress for this completion
+        const overallProgress = progressTracker.updateProgress(progressTracker.downloadedBytes)
+        sendDownloadingMessage(data.file, overallProgress, data.total || 0, data.total || 0)
     }
 }
 
@@ -354,14 +368,14 @@ function sendLoadingMessage(status, error = null, details = null) {
     })
 }
 
-async function sendDownloadingMessage(file, progress, loaded, total, overallProgress = null) {
+async function sendDownloadingMessage(file, progressPercent, loaded, total) {
     self.postMessage({
         type: MessageTypes.DOWNLOADING,
         file,
-        progress, // This is now the unified 0-1 progress
+        progress: progressPercent / 100, // Convert back to 0-1 for UI compatibility
         loaded,
         total,
-        progressPercent: overallProgress || (progress * 100) // Clean 0-100% for UI display
+        progressPercent: progressPercent // Clean 0-100% for display
     })
 }
 
