@@ -191,35 +191,6 @@ async function safePipelineLoad(task, model, config, timeout = PERFORMANCE_CONFI
 }
 
 /**
- * Check if device has sufficient capabilities for transcription
- */
-function checkDeviceCapabilities() {
-    const issues = []
-    
-    // Check for WebAssembly support
-    if (typeof WebAssembly === 'undefined') {
-        issues.push('WebAssembly not supported')
-    }
-    
-    // Check for SharedArrayBuffer (indicates proper security headers)
-    if (typeof SharedArrayBuffer === 'undefined') {
-        issues.push('SharedArrayBuffer not available - missing security headers')
-    }
-    
-    // Estimate available memory
-    const memoryEstimate = navigator.deviceMemory ? navigator.deviceMemory * 1024 : 2048
-    if (memoryEstimate < 1500) {
-        issues.push('Low device memory detected')
-    }
-    
-    return {
-        compatible: issues.length === 0,
-        issues,
-        memoryEstimate
-    }
-}
-
-/**
  * MAIN LISTENER
  */
 self.addEventListener('message', async (event) => {
@@ -227,13 +198,6 @@ self.addEventListener('message', async (event) => {
     const { type, audio } = event.data
 
     if (type === MessageTypes.INFERENCE_REQUEST) {
-        // Check device capabilities before processing
-        const capabilities = checkDeviceCapabilities()
-        if (!capabilities.compatible) {
-            console.error('❌ [WORKER] Device not compatible:', capabilities.issues)
-            sendLoadingMessage('failed', `Device not compatible: ${capabilities.issues.join(', ')}`)
-            return
-        }
         // Prevent concurrent transcriptions
         if (audioProcessingActive) {
             console.warn('⚠️ [WORKER] Transcription already in progress, ignoring request')
