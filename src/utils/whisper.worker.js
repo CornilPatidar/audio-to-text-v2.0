@@ -1,28 +1,54 @@
 import { pipeline } from '@huggingface/transformers'
 import { MessageTypes } from './presets'
 
+// Performance constants
+const PERFORMANCE_CONFIG = {
+    MODEL_LOAD_TIMEOUT: 30000,
+    TRANSCRIPTION_TIMEOUT: 120000,
+    MAX_AUDIO_DURATION: 600, // 10 minutes
+    RMS_SPEECH_THRESHOLD: 0.005,
+    CHUNK_SIZE: 30,
+    STRIDE_SIZE: 5,
+    MAX_RETRIES: 2
+}
+
+// Memory management
+let audioProcessingActive = false
+let currentTranscriptionController = null
+
+/**
+ * Ensure audio is Float32Array @ 16kHz mono
+ * Main thread already resamples to 16kHz using AudioContext
+ */
+function ensure16kMonoFloat32(audioData) {
+    validateAudioInput(audioData)
+    // Audio from main thread is already resampled to 16kHz
+    return audioData
+}
+
 class MyTranscriptionPipeline {
     static task = 'automatic-speech-recognition'
     static models = [
-        'Xenova/whisper-tiny.en',   // Fast loading ~39MB - prioritize for speed
+        'Xenova/whisper-tiny.en',
         'onnx-community/whisper-tiny.en',
-        'Xenova/whisper-small.en',  // Better accuracy ~240MB - secondary option
+        'Xenova/whisper-small.en',
         'onnx-community/whisper-small.en',
         'microsoft/whisper-tiny.en',
         'openai/whisper-tiny.en'
     ]
     static instance = null
     static currentModelIndex = 0
-    
-    // Simple unified progress tracking
+
     static progressTracker = {
         totalBytes: 0,
         downloadedBytes: 0,
-        fileProgress: new Map(), // Track individual file progress
+        fileProgress: new Map(),
         reset() {
             this.totalBytes = 0
             this.downloadedBytes = 0
             this.fileProgress.clear()
+            // Force garbage collection hint
+            if (global.gc) global.gc()
         },
         updateTotal(fileName, fileSize) {
             if (!this.fileProgress.has(fileName)) {
@@ -31,510 +57,348 @@ class MyTranscriptionPipeline {
             }
         },
         updateFileProgress(fileName, loaded) {
-            if (this.fileProgress.has(fileName)) {
-                this.fileProgress.get(fileName).loaded = loaded
+            const fileData = this.fileProgress.get(fileName)
+            if (fileData) {
+                fileData.loaded = loaded
             }
-            // Calculate total progress across all files
             let totalLoaded = 0
-            for (const fileData of this.fileProgress.values()) {
-                totalLoaded += fileData.loaded
+            for (const data of this.fileProgress.values()) {
+                totalLoaded += data.loaded
             }
             return this.totalBytes > 0 ? Math.min(100, (totalLoaded / this.totalBytes) * 100) : 0
         }
     }
 
+    static dispose() {
+        if (this.instance) {
+            try {
+                if (typeof this.instance.dispose === 'function') {
+                    this.instance.dispose()
+                }
+            } catch (e) {
+                console.warn('⚠️ [WORKER] Error disposing model:', e.message)
+            }
+            this.instance = null
+        }
+        this.progressTracker.reset()
+        this.currentModelIndex = 0
+    }
+
     static async getInstance(progress_callback = null) {
         if (this.instance === null) {
             let lastError = null
-            
-            // Reset progress tracker for new loading session
             this.progressTracker.reset()
-            
-            // Try each model in sequence until one works
+
             for (let i = this.currentModelIndex; i < this.models.length; i++) {
                 const model = this.models[i]
                 console.log(`🔄 [WORKER] Trying model ${i + 1}/${this.models.length}:`, model)
-                
+
                 try {
-                    // First try to load from cache with WebGPU
                     let pipelineConfig = {
                         progress_callback,
                         dtype: 'fp32',
-                        // Enhanced caching configuration
                         revision: 'main',
                         cache_dir: './models',
                         local_files_only: false,
-                        // Browser caching optimizations
                         use_cache: true,
-                        cache_timeout: 86400000, // 24 hours in milliseconds
-                        // Performance optimizations
-                        use_external_data_format: false  // Keep model data inline for better caching
+                        cache_timeout: 86400000,
+                        use_external_data_format: false
                     }
-                    
-                    // Try WebGPU first, fallback to CPU if not available
+
                     try {
                         pipelineConfig.device = 'webgpu'
                         this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
                     } catch (webgpuError) {
-                        console.warn(`⚠️ [WORKER] WebGPU not available for ${model}, falling back to CPU:`, webgpuError.message)
+                        console.warn(`⚠️ [WORKER] WebGPU not available, fallback to CPU`, webgpuError.message)
                         pipelineConfig.device = 'cpu'
                         this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
                     }
-                    
+
                     console.log('✅ [WORKER] Successfully loaded model:', model)
                     this.currentModelIndex = i
                     break
-                    
                 } catch (error) {
                     console.warn(`⚠️ [WORKER] Model ${model} failed:`, error.message)
                     lastError = error
-                    
-                    // If this is a JSON parsing error (HTML received), try next model immediately
-                    if (error.message.includes('Unexpected token') || error.message.includes('not valid JSON')) {
-                        console.log('🔄 [WORKER] Trying next model...')
-                        continue
-                    }
-                    
-                    // For other errors, wait a bit before trying next model
-                    if (i < this.models.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 2000))
-                    }
                 }
             }
-            
-            // If all models failed, throw the last error
+
             if (this.instance === null) {
-                console.error('💥 [WORKER] All models failed. Last error:', lastError)
-                // Reset index for next attempt
-                this.currentModelIndex = 0
                 throw new Error(`Failed to load any Whisper model. Last error: ${lastError?.message || 'Unknown error'}`)
             }
         }
-
         return this.instance
     }
 }
-        async function safePipelineLoad(task, model, config, timeout = 20000) {
-            return Promise.race([
-            pipeline(task, model, config),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("⏳ Model load timeout after 20s")), timeout))
-            ])
-        }
 
-self.addEventListener('message', async (event) => {
-    // Verify the message origin for security
-    if (!event.data || typeof event.data !== 'object') {
-        console.warn('⚠️ [WORKER] Invalid message received')
-        return
-    }
+async function safePipelineLoad(task, model, config, timeout = PERFORMANCE_CONFIG.MODEL_LOAD_TIMEOUT) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+        controller.abort()
+    }, timeout)
     
-    const { type, audio } = event.data
-    console.log('🔧 [WORKER] Received message:', type)
-    
-    if (type === MessageTypes.INFERENCE_REQUEST) {
-        console.log('🎯 [WORKER] Starting transcription process...', {
-            audioLength: audio?.length || 0,
-            audioType: typeof audio
-        })
-        await transcribe(audio)
-    }
-})
-function hasSpeech(audio) {
-    const rms = Math.sqrt(audio.reduce((sum, v) => sum + v*v, 0) / audio.length)
-    return rms > 0.005   // adjust threshold if needed
-  }
-async function transcribe(audio) {
-    console.log('🚀 [WORKER] Transcribe function started')
-    
-    // Validate and normalize audio data
-    console.log('🔍 [WORKER] Audio validation:', {
-        length: audio.length,
-        type: typeof audio,
-        isArray: Array.isArray(audio),
-        hasNaN: audio.some(val => isNaN(val)),
-        maxValue: Math.max(...audio.slice(0, 1000)),
-        minValue: Math.min(...audio.slice(0, 1000)),
-        avgAmplitude: audio.slice(0, 1000).reduce((a, b) => Math.abs(a) + Math.abs(b), 0) / 1000,
-        duration: `${(audio.length / 16000).toFixed(2)}s`
-    })
-    
-    // Add minimal padding to ensure complete processing while maximizing speed
-    const paddedAudio = new Float32Array(audio.length + 1600) // 0.1s padding (reduced from 0.2s)
-    paddedAudio.set(audio, 800) // 0.05s offset (reduced from 0.1s)
-    console.log('🔍 [WORKER] Added minimal padding for faster processing')
-    
-    sendLoadingMessage('loading')
-
-    let pipeline
-
-    let retryCount = 0
-    const maxRetries = 3
-    
-    while (retryCount < maxRetries) {
-        try {
-            console.log(`📦 [WORKER] Loading model (attempt ${retryCount + 1}/${maxRetries})...`)
-            pipeline = await MyTranscriptionPipeline.getInstance(load_model_callback)
-            console.log('✅ [WORKER] Model loaded, starting transcription...')
-            break
-        } catch (err) {
-            retryCount++
-            console.error(`❌ [WORKER] Model loading failed (attempt ${retryCount}/${maxRetries}):`, err.message)
-            
-            // Send more detailed error information to the main thread
-            self.postMessage({
-                type: MessageTypes.LOADING,
-                status: 'error',
-                error: err.message,
-                attempt: retryCount,
-                maxAttempts: maxRetries
-            })
-            
-            if (retryCount >= maxRetries) {
-                console.error('💥 [WORKER] All attempts failed:', err.message)
-                
-                self.postMessage({
-                    type: MessageTypes.LOADING,
-                    status: 'failed',
-                    error: 'Failed to load Whisper model after multiple attempts. Please check your internet connection and try again.',
-                    detailedError: err.message
-                })
-                return
-            }
-            
-            // Shorter wait for JSON parsing errors (likely HTML responses)
-            const isNetworkError = err.message.includes('Unexpected token') || err.message.includes('not valid JSON')
-            const waitTime = isNetworkError ? 1000 : Math.pow(2, retryCount) * 1000
-            
-            console.log(`⏳ [WORKER] Retrying in ${waitTime}ms...`)
-            await new Promise(resolve => setTimeout(resolve, waitTime))
-        }
-    }
-
-    console.log('🎉 [WORKER] Starting transcription...')
-    sendLoadingMessage('success')
-
-    const stride_length_s = 1  // Further reduced for faster processing and better overlap
-    const audioLength = Math.round(paddedAudio.length / 16000)
-    console.log(`⚙️ [WORKER] Processing ${audioLength}s of padded audio...`)
-
     try {
-        const generationTracker = new GenerationTracker(pipeline, stride_length_s)
-        console.log('🔄 [WORKER] Running speech recognition...')
-        
-        // Detect if we're using an English-only model
-        const currentModel = MyTranscriptionPipeline.models[MyTranscriptionPipeline.currentModelIndex]
-        const isEnglishOnlyModel = currentModel.includes('.en')
-        
-        // Base configuration for all models
-        const baseConfig = {
-            // Core settings
-            return_timestamps: true,
-            
-            // Sampling settings - more deterministic for structured content
-            do_sample: false,
-            top_k: 0,
-            temperature: 0.0,
-            
-            // Chunk processing - optimized for faster processing and better overlap
-            chunk_length_s: 30,  // Reduced for faster processing and to avoid 30s warning
-            stride_length_s: stride_length_s,  // Better overlap
-            
-            // Enhanced for educational content
-            word_timestamps: true,
-            suppress_tokens: [-1],
-            
-            // Callbacks
-            callback_function: generationTracker.callbackFunction.bind(generationTracker),
-            chunk_callback: generationTracker.chunkCallback.bind(generationTracker)
-        }
-        
-        // Add language/task only for multilingual models
-        const config = isEnglishOnlyModel 
-            ? baseConfig 
-            : {
-                ...baseConfig,
-                language: 'en',
-                task: 'transcribe'
-            }
-        
-        console.log(`🎯 [WORKER] Using ${isEnglishOnlyModel ? 'English-only' : 'multilingual'} model config:`, config)
-        
-        // Optimized settings for educational/structured content
-        const result = await pipeline(paddedAudio, config)
-        
-        console.log('✨ [WORKER] Recognition completed!')
-        
-        // If chunk callback didn't populate results, use direct pipeline result
-        if (generationTracker.processed_chunks.length === 0 && result) {
-            console.log('🔄 [WORKER] Processing direct result...')
-            
-            // Handle different possible result formats
-            let chunks = []
-            
-            if (Array.isArray(result)) {
-                chunks = result
-            } else if (result.chunks && result.chunks.length > 0) {
-                // Result has chunks property with content
-                chunks = result.chunks
-            } else if (result.text && result.text.trim()) {
-                // Single result object with text content
-                chunks = [result]
-            } else {
-                // No transcribable content found - create helpful message
-                console.log('⚠️ [WORKER] No speech detected in audio')
-                
-                if (!hasSpeech(paddedAudio)) {
-                    chunks = [{
-                        text: "⚠️ No clear speech detected. Please check volume/noise.",
-                        timestamp: [0, Math.round(paddedAudio.length / 16000)]
-                    }]
-                } else {
-                    chunks = [result] // keep Whisper’s raw output if audio has energy
-                }
-            }
-            
-            generationTracker.processed_chunks = chunks.map((chunk, index) => {
-                return {
-                    index,
-                    text: chunk.text?.trim() || chunk?.trim() || '',
-                    start: Math.round(chunk.timestamp?.[0] || 0),
-                    end: Math.round(chunk.timestamp?.[1] || 0)
-                }
-            })
-            
-            console.log('📋 [WORKER] Processed', generationTracker.processed_chunks.length, 'text chunks')
-        }
-        
-        generationTracker.sendFinalResult()
-        console.log('🏁 [WORKER] Transcription complete!')
-    } catch (err) {
-        console.error('❌ [WORKER] Transcription error:', err.message)
+        const result = await Promise.race([
+            pipeline(task, model, { ...config, signal: controller.signal }),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error(`⏳ Model load timeout after ${timeout/1000}s`)), timeout)
+            )
+        ])
+        clearTimeout(timeoutId)
+        return result
+    } catch (error) {
+        clearTimeout(timeoutId)
+        controller.abort()
+        throw error
     }
 }
 
+/**
+ * MAIN LISTENER
+ */
+self.addEventListener('message', async (event) => {
+    if (!event.data || typeof event.data !== 'object') return
+    const { type, audio } = event.data
+
+    if (type === MessageTypes.INFERENCE_REQUEST) {
+        // Prevent concurrent transcriptions
+        if (audioProcessingActive) {
+            console.warn('⚠️ [WORKER] Transcription already in progress, ignoring request')
+            return
+        }
+        
+        console.log('🎯 [WORKER] Starting transcription...')
+        audioProcessingActive = true
+        
+        try {
+            await transcribe(audio)
+        } finally {
+            audioProcessingActive = false
+            currentTranscriptionController = null
+        }
+    } else if (type === 'CANCEL_TRANSCRIPTION') {
+        if (currentTranscriptionController) {
+            currentTranscriptionController.abort()
+            console.log('⏹️ [WORKER] Transcription cancelled')
+        }
+    } else if (type === 'DISPOSE') {
+        MyTranscriptionPipeline.dispose()
+        console.log('🗑️ [WORKER] Worker disposed')
+    }
+})
+
+function calculateRMS(float32Audio) {
+    let sum = 0
+    const length = float32Audio.length
+    for (let i = 0; i < length; i++) {
+        sum += float32Audio[i] * float32Audio[i]
+    }
+    return Math.sqrt(sum / length)
+}
+
+function hasSpeech(float32Audio, rms = null) {
+    const actualRMS = rms ?? calculateRMS(float32Audio)
+    return actualRMS > PERFORMANCE_CONFIG.RMS_SPEECH_THRESHOLD
+}
+
+function validateAudioInput(audioData) {
+    if (!(audioData instanceof Float32Array)) {
+        throw new Error("Expected Float32Array audio input")
+    }
+    
+    const duration = audioData.length / 16000
+    if (duration > PERFORMANCE_CONFIG.MAX_AUDIO_DURATION) {
+        throw new Error(`Audio too long: ${duration.toFixed(1)}s (max: ${PERFORMANCE_CONFIG.MAX_AUDIO_DURATION}s)`)
+    }
+    
+    if (duration < 0.1) {
+        throw new Error("Audio too short (minimum 0.1 seconds)")
+    }
+    
+    return duration
+}
+
+/**
+ * Transcription core
+ */
+async function transcribe(audioData) {
+    let float32Audio = null
+    
+    try {
+        // Input validation and preprocessing
+        float32Audio = ensure16kMonoFloat32(audioData)
+        const duration = validateAudioInput(float32Audio)
+        const rms = calculateRMS(float32Audio)
+        
+        console.log('🔍 [WORKER] Audio stats:', {
+            length: float32Audio.length,
+            durationSec: duration.toFixed(2),
+            rms: rms.toFixed(6)
+        })
+
+        // Early speech detection
+        if (!hasSpeech(float32Audio, rms)) {
+            const noSpeechResult = [{
+                index: 0,
+                text: "⚠️ No clear speech detected. Please check volume/noise.",
+                start: 0,
+                end: Math.round(duration)
+            }]
+            createResultMessage(noSpeechResult, true, Math.round(duration))
+            self.postMessage({ type: MessageTypes.INFERENCE_DONE })
+            return
+        }
+
+        sendLoadingMessage('loading')
+
+        // Create cancellation controller
+        currentTranscriptionController = new AbortController()
+        
+        const model = await MyTranscriptionPipeline.getInstance(load_model_callback)
+
+        const config = {
+            return_timestamps: true,
+            do_sample: false,
+            temperature: 0,
+            suppress_tokens: [-1],
+            condition_on_previous_text: false,
+            initial_prompt: "This is a dictation. Only transcribe exactly what is spoken in the audio.",
+            word_timestamps: true,
+            chunk_length_s: PERFORMANCE_CONFIG.CHUNK_SIZE,
+            stride_length_s: PERFORMANCE_CONFIG.STRIDE_SIZE,
+            signal: currentTranscriptionController.signal
+        }
+
+        console.log('⚙️ [WORKER] Running Whisper...')
+        
+        // Add timeout for transcription
+        const transcriptionPromise = model(float32Audio, config)
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Transcription timeout')), PERFORMANCE_CONFIG.TRANSCRIPTION_TIMEOUT)
+        )
+        
+        const result = await Promise.race([transcriptionPromise, timeoutPromise])
+        console.log('✨ [WORKER] Result received')
+
+        // Process results efficiently
+        const finalResult = processTranscriptionResult(result, duration)
+        
+        console.log(`📝 [WORKER] Final result: ${finalResult.length} segments`)
+        createResultMessage(finalResult, true, finalResult[finalResult.length - 1]?.end || Math.round(duration))
+        self.postMessage({ type: MessageTypes.INFERENCE_DONE })
+        
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            console.log('⏹️ [WORKER] Transcription cancelled')
+            sendLoadingMessage('cancelled', 'Transcription was cancelled')
+        } else {
+            console.error("❌ [WORKER] Transcription error:", err.message)
+            sendLoadingMessage('failed', err.message)
+        }
+    } finally {
+        // Clean up memory
+        if (float32Audio) {
+            float32Audio = null
+        }
+        currentTranscriptionController = null
+        
+        // Suggest garbage collection
+        if (global.gc) global.gc()
+    }
+}
+
+function processTranscriptionResult(result, duration) {
+    if (!result) {
+        return [{
+            index: 0,
+            text: "⚠️ Transcription failed. Please try again.",
+            start: 0,
+            end: Math.round(duration)
+        }]
+    }
+
+    // Handle chunked results (longer audio)
+    if (result.chunks && Array.isArray(result.chunks) && result.chunks.length > 0) {
+        return result.chunks
+            .map((chunk, index) => {
+                let chunkText = ""
+                let startTime = 0
+                let endTime = 0
+                
+                if (typeof chunk === 'string') {
+                    chunkText = chunk.trim()
+                } else if (chunk && typeof chunk === 'object') {
+                    chunkText = (chunk.text || chunk.transcript || chunk.content || "").toString().trim()
+                    startTime = Math.round(chunk.timestamp?.[0] || chunk.start || 0)
+                    endTime = Math.round(chunk.timestamp?.[1] || chunk.end || 0)
+                }
+                
+                return {
+                    index,
+                    text: chunkText,
+                    start: startTime,
+                    end: endTime
+                }
+            })
+            .filter(chunk => chunk.text.length > 0)
+    }
+    
+    // Handle single text result (shorter audio)
+    if (result.text?.trim()) {
+        return [{
+            index: 0,
+            text: result.text.trim(),
+            start: 0,
+            end: Math.round(duration)
+        }]
+    }
+
+    // No valid result
+    return [{
+        index: 0,
+        text: "⚠️ No transcription generated. Please try again.",
+        start: 0,
+        end: Math.round(duration)
+    }]
+}
+
+/**
+ * Progress and messaging
+ */
 async function load_model_callback(data) {
     const { status } = data
     const progressTracker = MyTranscriptionPipeline.progressTracker
-    
-    if (status === 'initiate') {
-        console.log('📦 [WORKER] Initiating download:', data.file)
-        // Register file size when download initiates
-        if (data.file && data.total) {
-            progressTracker.updateTotal(data.file, data.total)
-        }
-    } else if (status === 'download') {
-        console.log('📦 [WORKER] Starting download:', data.file)
-    } else if (status === 'progress') {
-        const { file, progress, loaded, total } = data
-        
-        // Detect potential HTML error pages
-        const isSuspicious = progress > 10 && total < 10000
-        const isLikelyHTML = total < 5000 && file?.includes('.json')
-        
-        // Register file size if we haven't seen it before (fallback)
+
+    if (status === 'progress') {
+        const { file, loaded, total } = data
         if (file && total && !progressTracker.fileProgress.has(file)) {
             progressTracker.updateTotal(file, total)
         }
-        
-        // Calculate unified progress across all files
         const overallProgress = progressTracker.updateFileProgress(file, loaded)
-        
-        // Only log important download milestones to reduce console spam
-        const shouldLog = overallProgress === 0 || overallProgress >= 100 || 
-                         (Math.floor(overallProgress) % 25 === 0) ||
-                         isSuspicious || isLikelyHTML
-        
-        if (shouldLog) {
-            console.log('📥 [WORKER] Model download progress:', {
-                file: file.split('/').pop(), // Show just filename
-                fileProgress: `${(progress * 100).toFixed(1)}%`,
-                overallProgress: `${overallProgress.toFixed(1)}%`,
-                loaded: `${(loaded / 1024 / 1024).toFixed(1)} MB`,
-                total: `${(total / 1024 / 1024).toFixed(1)} MB`
-            })
-        }
-        
-        // Enhanced detection of HTML error pages
-        if (isSuspicious || isLikelyHTML) {
-            console.warn('⚠️ [WORKER] Suspicious download detected - likely receiving HTML error pages instead of model files')
-            console.warn('   This usually indicates:')
-            console.warn('   - Model repository not found (404)')
-            console.warn('   - Network/CORS issues')
-            console.warn('   - Hugging Face CDN problems')
-        }
-        
-        // Send unified progress (0-100%)
         sendDownloadingMessage(file, overallProgress, loaded, total)
-    } else if (status === 'done') {
-        console.log('✅ [WORKER] Downloaded:', data.file)
-        // Mark file as complete and calculate final progress
-        if (data.file && progressTracker.fileProgress.has(data.file)) {
-            const fileData = progressTracker.fileProgress.get(data.file)
-            const overallProgress = progressTracker.updateFileProgress(data.file, fileData.total)
-            sendDownloadingMessage(data.file, overallProgress, fileData.total, fileData.total)
-        }
     }
 }
 
-function sendLoadingMessage(status, error = null, details = null) {
-    self.postMessage({
-        type: MessageTypes.LOADING,
-        status,
-        error,
-        details
-    })
+function sendLoadingMessage(status, error = null) {
+    self.postMessage({ type: MessageTypes.LOADING, status, error })
 }
 
 async function sendDownloadingMessage(file, progressPercent, loaded, total) {
     self.postMessage({
         type: MessageTypes.DOWNLOADING,
         file,
-        progress: progressPercent / 100, // Convert back to 0-1 for UI compatibility
+        progress: progressPercent / 100,
         loaded,
         total,
-        progressPercent: progressPercent // Clean 0-100% for display
+        progressPercent
     })
-}
-
-class GenerationTracker {
-    constructor(pipeline, stride_length_s) {
-        this.pipeline = pipeline
-        this.stride_length_s = stride_length_s
-        this.chunks = []
-        this.time_precision = pipeline?.processor.feature_extractor.config.chunk_length / pipeline.model.config.max_source_positions
-        this.processed_chunks = []
-        this.callbackFunctionCounter = 0
-    }
-
-    sendFinalResult() {
-        console.log('🏁 [WORKER] Sending final result...')
-        console.log('🏁 [WORKER] Processed chunks count:', this.processed_chunks.length)
-        console.log('🏁 [WORKER] Processed chunks content:', this.processed_chunks)
-        
-        // Send final results with isDone: true
-        createResultMessage(
-            this.processed_chunks, true, this.getLastChunkTimestamp()
-        )
-        
-        // Then send completion signal
-        self.postMessage({ type: MessageTypes.INFERENCE_DONE })
-    }
-
-    callbackFunction(beams) {
-        this.callbackFunctionCounter += 1
-        if (this.callbackFunctionCounter % 10 !== 0) {
-            return
-        }
-
-        const bestBeam = beams[0]
-        let text = this.pipeline.tokenizer.decode(bestBeam.output_token_ids, {
-            skip_special_tokens: true
-        })
-
-        const result = {
-            text,
-            start: this.getLastChunkTimestamp(),
-            end: undefined
-        }
-
-        createPartialResultMessage(result)
-    }
-
-    chunkCallback(data) {
-        console.log('🔄 [WORKER] chunkCallback called with data:', data)
-        this.chunks.push(data)
-        const [text, { chunks }] = this.pipeline.tokenizer._decode_asr(
-            this.chunks,
-            {
-                time_precision: this.time_precision,
-                return_timestamps: true,
-                force_full_sequence: false
-            }
-        )
-        
-        console.log('🔄 [WORKER] Decoded chunks:', chunks)
-        console.log('🔄 [WORKER] Decoded text:', text)
-
-        // Process new chunks and accumulate them
-        const newProcessedChunks = chunks.map((chunk, index) => {
-            return this.processChunk(chunk, this.processed_chunks.length + index)
-        })
-        
-        // More conservative duplicate removal to prevent missing content
-        for (const newChunk of newProcessedChunks) {
-            // Only consider it a duplicate if timestamps are very close AND text is similar
-            const existingIndex = this.processed_chunks.findIndex(existing => 
-                Math.abs(existing.start - newChunk.start) < 0.5 && 
-                Math.abs(existing.end - newChunk.end) < 0.5 &&
-                existing.text.length > 0 && newChunk.text.length > 0
-            )
-            
-            if (existingIndex >= 0) {
-                const isSimilar = newChunk.text.toLowerCase() === this.processed_chunks[existingIndex].text.toLowerCase()
-                if (!isSimilar && newChunk.text.length > this.processed_chunks[existingIndex].text.length) {
-                    this.processed_chunks[existingIndex] = newChunk
-                }
-            } else {
-                if (newChunk.text.trim().length > 0) {
-                    this.processed_chunks.push(newChunk)
-                }
-            }
-        }
-        
-        // Sort chunks by start time to maintain order
-        this.processed_chunks.sort((a, b) => a.start - b.start)
-
-        console.log('🔄 [WORKER] Accumulated processed chunks:', this.processed_chunks.length, 'total chunks')
-        console.log('🔄 [WORKER] Chunk timestamps:', this.processed_chunks.map(c => `${c.start}-${c.end}s`))
-
-        createResultMessage(
-            this.processed_chunks, false, this.getLastChunkTimestamp()
-        )
-    }
-
-    getLastChunkTimestamp() {
-        if (this.processed_chunks.length === 0) {
-            return 0
-        }
-        // Return the end timestamp of the last chunk
-        const lastChunk = this.processed_chunks[this.processed_chunks.length - 1]
-        return lastChunk.end || lastChunk.start || 0
-    }
-
-    processChunk(chunk, index) {
-        const { text, timestamp } = chunk
-        const [start, end] = timestamp
-
-        return {
-            index,
-            text: `${text.trim()}`,
-            start: Math.round(start),
-            end: Math.round(end) || Math.round(start + 0.9 * this.stride_length_s)
-        }
-
-    }
 }
 
 function createResultMessage(results, isDone, completedUntilTimestamp) {
-    console.log('📤 [WORKER] Sending RESULT message:', {
-        type: MessageTypes.RESULT,
-        results,
-        isDone,
-        completedUntilTimestamp,
-        resultsCount: results?.length || 0
-    })
-    
     self.postMessage({
         type: MessageTypes.RESULT,
         results,
         isDone,
         completedUntilTimestamp
-    })
-}
-
-function createPartialResultMessage(result) {
-    self.postMessage({
-        type: MessageTypes.RESULT_PARTIAL,
-        result
     })
 }

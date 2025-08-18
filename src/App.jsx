@@ -21,6 +21,7 @@ function App() {
     progress: 0,
     details: ''
   })
+  const [isTranscribing, setIsTranscribing] = useState(false)
 
   const isAudioAvailable = file || audioStream
 
@@ -29,13 +30,32 @@ function App() {
     setAudioStream(null)
   }
 
+  function handleCancelTranscription() {
+    if (worker.current && isTranscribing) {
+      console.log('⏹️ [APP] Cancelling transcription...')
+      worker.current.postMessage({ type: 'CANCEL_TRANSCRIPTION' })
+      setIsTranscribing(false)
+      setLoading(false)
+      setDownloading(false)
+      setProcessingStatus({
+        stage: 'cancelled',
+        message: 'Transcription cancelled',
+        progress: 0,
+        details: 'User cancelled the process'
+      })
+    }
+  }
+
   const worker = useRef(null)
 
   useEffect(() => {
+    // Create worker once and keep it alive
     if (!worker.current) {
       worker.current = new Worker(new URL('./utils/whisper.worker', import.meta.url), {
         type: 'module'
       })
+      
+      console.log('🔧 [APP] Worker created')
     }
 
     const onMessageReceived = async (e) => {
@@ -68,6 +88,7 @@ function App() {
         }
         case 'LOADING':
           if (e.data.status === 'error' || e.data.status === 'failed') {
+            setIsTranscribing(false)
             setLoading(false)
             setDownloading(false)
             setProcessingStatus({
@@ -136,6 +157,7 @@ function App() {
           })
           break;
         case 'INFERENCE_DONE':
+          setIsTranscribing(false)
           setLoading(false)
           setFinished(true)
           setProcessingStatus({
@@ -146,6 +168,18 @@ function App() {
           })
           console.log('🏁 Transcription completed!')
           break;
+        case 'CANCELLED':
+          setIsTranscribing(false)
+          setLoading(false)
+          setDownloading(false)
+          setProcessingStatus({
+            stage: 'cancelled',
+            message: 'Transcription cancelled',
+            progress: 0,
+            details: 'Process was cancelled by user'
+          })
+          console.log('⏹️ Transcription cancelled!')
+          break;
         default:
           console.log('❓ Unknown message type:', e.data.type, e.data)
           break;
@@ -154,8 +188,20 @@ function App() {
 
     worker.current.addEventListener('message', onMessageReceived)
 
-    return () => worker.current.removeEventListener('message', onMessageReceived)
-  })
+    // Cleanup on component unmount only
+    return () => {
+      if (worker.current) {
+        worker.current.removeEventListener('message', onMessageReceived)
+        console.log('🔧 [APP] Worker event listener removed')
+        
+        // Only dispose worker when app is unmounting
+        worker.current.postMessage({ type: 'DISPOSE' })
+        worker.current.terminate()
+        worker.current = null
+        console.log('🗑️ [APP] Worker disposed and terminated')
+      }
+    }
+  }, []) // Empty dependency array - only run once
 
   async function readAudioFrom(file) {
     const sampling_rate = 16000
@@ -173,9 +219,16 @@ function App() {
       return 
     }
 
+    // Prevent concurrent transcriptions
+    if (isTranscribing) {
+      console.warn('⚠️ [APP] Transcription already in progress')
+      return
+    }
+
     console.log('📁 Processing:', file?.name || 'audio stream')
 
     try {
+      setIsTranscribing(true)
       setProcessingStatus({
         stage: 'preparing',
         message: 'Preparing audio',
@@ -206,6 +259,7 @@ function App() {
       console.log('✅ Processing started...')
     } catch (error) {
       console.error('❌ Error during audio processing:', error)
+      setIsTranscribing(false)
       setProcessingStatus({
         stage: 'error',
         message: 'Audio processing failed',
@@ -222,9 +276,19 @@ function App() {
         {output ? (
           <Information output={output} finished={finished}/>
         ) : loading ? (
-          <Transcribing downloading={downloading} processingStatus={processingStatus} />
+          <Transcribing 
+            downloading={downloading} 
+            processingStatus={processingStatus} 
+            onCancel={isTranscribing ? handleCancelTranscription : null}
+          />
         ) : isAudioAvailable ? (
-          <FileDisplay handleFormSubmission={handleFormSubmission} handleAudioReset={handleAudioReset} file={file} audioStream={audioStream} />
+          <FileDisplay 
+            handleFormSubmission={handleFormSubmission} 
+            handleAudioReset={handleAudioReset} 
+            file={file} 
+            audioStream={audioStream}
+            isTranscribing={isTranscribing}
+          />
         ) : (
           <HomePage setFile={setFile} setAudioStream={setAudioStream} />
         )}

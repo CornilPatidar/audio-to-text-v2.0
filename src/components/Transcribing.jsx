@@ -1,7 +1,7 @@
 import React from 'react'
 
 function Transcribing(props) {
-    const { downloading, processingStatus } = props
+    const { processingStatus, onCancel } = props
     
     const getStatusIcon = (stage) => {
         switch (stage) {
@@ -12,6 +12,7 @@ function Transcribing(props) {
             case 'transcribing': return '🎯'
             case 'complete': return '✅'
             case 'error': return '❌'
+            case 'cancelled': return '⏹️'
             default: return '🎤'
         }
     }
@@ -57,6 +58,17 @@ function Transcribing(props) {
                     )
                 })}
             </div>
+            
+            {onCancel && (
+                <button 
+                    onClick={onCancel}
+                    className='bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg duration-200 flex items-center gap-2'
+                    title="Cancel transcription"
+                >
+                    <i className="fa-solid fa-stop"></i>
+                    Cancel
+                </button>
+            )}
         </div>
     )
 }

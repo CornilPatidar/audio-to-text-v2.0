@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 
 export default function FileDisplay(props) {
-    const { handleAudioReset, file, audioStream, handleFormSubmission } = props;
+    const { handleAudioReset, file, audioStream, handleFormSubmission, isTranscribing } = props;
     const audioRef = useRef();
     const [audioSrc, setAudioSrc] = useState(null);
 
@@ -67,13 +67,20 @@ export default function FileDisplay(props) {
                     )}
                 <button
                     onClick={() => {
-                        console.log('🎯 Transcribe button clicked in FileDisplay component')
-                        handleFormSubmission()
+                        if (!isTranscribing) {
+                            console.log('🎯 Transcribe button clicked in FileDisplay component')
+                            handleFormSubmission()
+                        }
                     }}
-                    className="specialBtn px-3 p-2 rounded-lg text-red-400 flex items-center gap-2 font-medium"
+                    disabled={isTranscribing}
+                    className={`specialBtn px-3 p-2 rounded-lg flex items-center gap-2 font-medium ${
+                        isTranscribing 
+                            ? 'text-gray-400 cursor-not-allowed' 
+                            : 'text-red-400 hover:text-red-600'
+                    }`}
                 >
-                    <p>Transcribe</p>
-                    <i className="fa-solid fa-pen-nib"></i>
+                    <p>{isTranscribing ? 'Processing...' : 'Transcribe'}</p>
+                    <i className={`fa-solid ${isTranscribing ? 'fa-spinner animate-spin' : 'fa-pen-nib'}`}></i>
                 </button>
             </div>
         </main>
