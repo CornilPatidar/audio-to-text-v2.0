@@ -5,7 +5,9 @@ import Header from './components/Header'
 import FileDisplay from './components/FileDisplay'
 import Information from './components/Information'
 import Transcribing from './components/Transcribing'
+import CompatibilityWarning from './components/CompatibilityWarning'
 import { MessageTypes } from './utils/presets'
+import { CompatibilityChecker } from './utils/compatibility'
 
 
 function App() {
@@ -22,6 +24,9 @@ function App() {
     details: ''
   })
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [compatibilityReport, setCompatibilityReport] = useState(null)
+  const [showCompatibilityWarning, setShowCompatibilityWarning] = useState(false)
+  const [compatibilityChecked, setCompatibilityChecked] = useState(false)
 
   const isAudioAvailable = file || audioStream
 
@@ -46,9 +51,47 @@ function App() {
     }
   }
 
+  async function performCompatibilityCheck() {
+    console.log('🔍 [APP] Checking device compatibility...')
+    try {
+      await CompatibilityChecker.performChecks()
+      const report = CompatibilityChecker.getCompatibilityReport()
+      
+      setCompatibilityReport(report)
+      setCompatibilityChecked(true)
+      
+      // Show warning if there are issues or warnings
+      if (!report.compatible || report.warnings.length > 0) {
+        setShowCompatibilityWarning(true)
+      }
+      
+      console.log('✅ [APP] Compatibility check completed:', report)
+      return report
+    } catch (error) {
+      console.error('❌ [APP] Compatibility check failed:', error)
+      setCompatibilityChecked(true)
+      return null
+    }
+  }
+
+  function handleCompatibilityDismiss() {
+    setShowCompatibilityWarning(false)
+  }
+
+  async function handleCompatibilityRetry() {
+    setCompatibilityChecked(false)
+    setShowCompatibilityWarning(false)
+    await performCompatibilityCheck()
+  }
+
   const worker = useRef(null)
 
   useEffect(() => {
+    // Perform compatibility check first
+    if (!compatibilityChecked) {
+      performCompatibilityCheck()
+    }
+
     // Create worker once and keep it alive
     if (!worker.current) {
       worker.current = new Worker(new URL('./utils/whisper.worker', import.meta.url), {
@@ -225,6 +268,18 @@ function App() {
       return
     }
 
+    // Check device compatibility before starting
+    if (!compatibilityChecked) {
+      const report = await performCompatibilityCheck()
+      if (report && !report.compatible) {
+        alert('Your device is not compatible with this application. Please check the compatibility warnings for more details.')
+        return
+      }
+    } else if (compatibilityReport && !compatibilityReport.compatible) {
+      alert('Your device is not compatible with this application. Please check the compatibility warnings for more details.')
+      return
+    }
+
     console.log('📁 Processing:', file?.name || 'audio stream')
 
     try {
@@ -294,6 +349,15 @@ function App() {
         )}
       </section>
       <footer></footer>
+      
+      {/* Compatibility Warning Modal */}
+      {showCompatibilityWarning && compatibilityReport && (
+        <CompatibilityWarning
+          compatibilityReport={compatibilityReport}
+          onDismiss={handleCompatibilityDismiss}
+          onRetry={handleCompatibilityRetry}
+        />
+      )}
     </div>
   )
 }
