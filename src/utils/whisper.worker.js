@@ -102,16 +102,30 @@ class MyTranscriptionPipeline {
                         local_files_only: false,
                         use_cache: true,
                         cache_timeout: 86400000,
-                        use_external_data_format: false
+                        use_external_data_format: false,
+                        // Browser-specific optimizations
+                        quantized: true,
+                        session_options: {
+                            enableMemPattern: false,
+                            enableCpuMemArena: false,
+                            executionMode: 'sequential'
+                        }
                     }
 
                     try {
                         pipelineConfig.device = 'webgpu'
                         this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
                     } catch (webgpuError) {
-                        console.warn(`⚠️ [WORKER] WebGPU not available, fallback to CPU`, webgpuError.message)
-                        pipelineConfig.device = 'cpu'
-                        this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
+                        console.warn(`⚠️ [WORKER] WebGPU not available, fallback to WASM`, webgpuError.message)
+                        try {
+                            pipelineConfig.device = 'wasm'
+                            this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
+                        } catch (wasmError) {
+                            console.warn(`⚠️ [WORKER] WASM failed, trying auto-detection`, wasmError.message)
+                            // Remove device specification to let the library auto-detect
+                            delete pipelineConfig.device
+                            this.instance = await safePipelineLoad(this.task, model, pipelineConfig)
+                        }
                     }
 
                     console.log('✅ [WORKER] Successfully loaded model:', model)
@@ -119,12 +133,35 @@ class MyTranscriptionPipeline {
                     break
                 } catch (error) {
                     console.warn(`⚠️ [WORKER] Model ${model} failed:`, error.message)
+                    
+                    // Provide specific error context based on error type
+                    if (error.message.includes('device') || error.message.includes('wasm') || error.message.includes('cpu')) {
+                        console.error('💻 [WORKER] Device compatibility issue - trying next model')
+                    } else if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('cdn')) {
+                        console.error('🌐 [WORKER] Network/CDN issue - trying next model')
+                    } else if (error.message.includes('timeout')) {
+                        console.error('⏰ [WORKER] Timeout loading model - trying next model')
+                    }
+                    
                     lastError = error
                 }
             }
 
             if (this.instance === null) {
-                throw new Error(`Failed to load any Whisper model. Last error: ${lastError?.message || 'Unknown error'}`)
+                let errorMessage = `Failed to load any Whisper model. Last error: ${lastError?.message || 'Unknown error'}`
+                
+                // Provide specific guidance based on the error type
+                if (lastError?.message?.includes('device') || lastError?.message?.includes('wasm') || lastError?.message?.includes('cpu')) {
+                    errorMessage += '\n\nDevice compatibility issue: Your browser or device may not support the required WebAssembly features. Try updating your browser or using a different device.'
+                } else if (lastError?.message?.includes('fetch') || lastError?.message?.includes('network') || lastError?.message?.includes('cdn')) {
+                    errorMessage += '\n\nNetwork issue: Please check your internet connection and try again. The AI models need to be downloaded from Hugging Face servers.'
+                } else if (lastError?.message?.includes('timeout')) {
+                    errorMessage += '\n\nTimeout error: The model download took too long. Please check your internet connection and try again.'
+                } else {
+                    errorMessage += '\n\nThis could be due to:\n- Network connectivity issues\n- Browser compatibility problems\n- Temporary server issues\n\nPlease try refreshing the page or using a different browser.'
+                }
+                
+                throw new Error(errorMessage)
             }
         }
         return this.instance

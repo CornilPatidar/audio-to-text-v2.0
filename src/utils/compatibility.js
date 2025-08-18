@@ -63,8 +63,16 @@ export class CompatibilityChecker {
 
     static checkWebAssembly() {
         try {
-            return !!(window.WebAssembly)
+            if (!window.WebAssembly) return false
+            
+            // Test basic WebAssembly functionality
+            const wasmCode = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00])
+            const wasmModule = new WebAssembly.Module(wasmCode)
+            const wasmInstance = new WebAssembly.Instance(wasmModule)
+            
+            return true
         } catch (e) {
+            console.warn('WebAssembly test failed:', e.message)
             return false
         }
     }
@@ -154,6 +162,8 @@ export class CompatibilityChecker {
 
         if (!this.checks.webAssembly) {
             issues.push('WebAssembly not supported - AI models cannot run')
+        } else if (!this.checks.sharedArrayBuffer) {
+            warnings.push('WebAssembly available but SharedArrayBuffer missing - models may load slowly or fail')
         }
 
         if (this.checks.estimatedRAM < 2000) {
