@@ -1,90 +1,110 @@
 import { MessageTypes } from './presets'
 
-// Rev AI API Configuration
+// RevAI API Configuration
+// Use CORS proxy in production to avoid CORS issues
+const isDevelopment = import.meta.env.DEV
+const CORS_PROXY = 'https://corsproxy.io/?'
+
 const REVAI_CONFIG = {
-    BASE_URL: '/api/revai', // This will be proxied to https://api.rev.ai/speechtotext/v1
+    // Use proxy in production, direct proxy in development
+    BASE_URL: isDevelopment ? '/api/revai' : `${CORS_PROXY}https://api.rev.ai/speechtotext/v1`,
     POLL_INTERVAL: 2000, // 2 seconds
     MAX_POLL_ATTEMPTS: 150, // 5 minutes max
     SUPPORTED_FORMATS: ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'webm']
 }
 
-// State management
-let currentJobId = null
-let pollInterval = null
-let pollAttempts = 0
+// State management for tracking transcription progress
+let currentJobId = null      // Current RevAI job ID being processed
+let pollInterval = null      // Interval timer for polling job status
+let pollAttempts = 0         // Counter for polling attempts
 
 /**
- * Convert audio data to file for upload
+ * Convert audio data to WAV file format for upload
+ * RevAI requires audio files to be uploaded, so we convert the raw audio data
+ * to a WAV file that can be sent via FormData
  */
 function audioDataToFile(audioData, fileName = 'audio.wav') {
-    // Convert Float32Array to WAV format
-    const sampleRate = 16000
-    const numChannels = 1
-    const bitsPerSample = 16
+    // Audio format specifications for WAV file
+    const sampleRate = 16000      // 16kHz sample rate (RevAI requirement)
+    const numChannels = 1         // Mono audio
+    const bitsPerSample = 16      // 16-bit audio
     
+    // Calculate buffer size: 44 bytes for WAV header + 2 bytes per sample
     const buffer = new ArrayBuffer(44 + audioData.length * 2)
     const view = new DataView(buffer)
     
-    // WAV header
+    // Helper function to write strings to the buffer
     const writeString = (offset, string) => {
         for (let i = 0; i < string.length; i++) {
             view.setUint8(offset + i, string.charCodeAt(i))
         }
     }
     
-    writeString(0, 'RIFF')
-    view.setUint32(4, 36 + audioData.length * 2, true)
-    writeString(8, 'WAVE')
-    writeString(12, 'fmt ')
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, numChannels, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, sampleRate * numChannels * bitsPerSample / 8, true)
-    view.setUint16(32, numChannels * bitsPerSample / 8, true)
-    view.setUint16(34, bitsPerSample, true)
-    writeString(36, 'data')
-    view.setUint32(40, audioData.length * 2, true)
+    // Write WAV file header (44 bytes)
+    writeString(0, 'RIFF')                                    // Chunk ID
+    view.setUint32(4, 36 + audioData.length * 2, true)       // File size
+    writeString(8, 'WAVE')                                    // Format
+    writeString(12, 'fmt ')                                   // Subchunk1 ID
+    view.setUint32(16, 16, true)                             // Subchunk1 size
+    view.setUint16(20, 1, true)                              // Audio format (PCM)
+    view.setUint16(22, numChannels, true)                    // Number of channels
+    view.setUint32(24, sampleRate, true)                     // Sample rate
+    view.setUint32(28, sampleRate * numChannels * bitsPerSample / 8, true)  // Byte rate
+    view.setUint16(32, numChannels * bitsPerSample / 8, true)               // Block align
+    view.setUint16(34, bitsPerSample, true)                  // Bits per sample
+    writeString(36, 'data')                                   // Subchunk2 ID
+    view.setUint32(40, audioData.length * 2, true)           // Subchunk2 size
     
-    // Audio data
+    // Write audio data samples
     let offset = 44
     for (let i = 0; i < audioData.length; i++) {
+        // Clamp audio sample to [-1, 1] range and convert to 16-bit integer
         const sample = Math.max(-1, Math.min(1, audioData[i]))
         view.setInt16(offset, sample * 0x7FFF, true)
         offset += 2
     }
     
+    // Create and return a File object from the buffer
     return new File([buffer], fileName, { type: 'audio/wav' })
 }
 
 /**
- * Upload file to Rev AI
+ * Submit audio file to RevAI for transcription
+ * This function uploads the audio file and returns a job ID for tracking
  */
 async function submitJob(audioFile) {
     console.log(' [REVAI WORKER] Submitting job to:', `${REVAI_CONFIG.BASE_URL}/jobs`)
     console.log(' [REVAI WORKER] API Key present:', !!REVAI_API_KEY)
+    console.log('🌍 [REVAI WORKER] Environment:', isDevelopment ? 'Development' : 'Production')
     
+    // Create FormData for file upload
     const formData = new FormData()
-    formData.append('media', audioFile)
-    formData.append('metadata', 'Audio transcription from web app')
+    formData.append('media', audioFile)                       // Audio file
+    formData.append('metadata', 'Audio transcription from web app')  // Optional metadata
     
     try {
+        // Prepare headers based on environment
+        const headers = {
+            'Authorization': `Bearer ${REVAI_API_KEY}`    // API authentication
+        }
+        
+        // Send POST request to RevAI API
         const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${REVAI_API_KEY}`
-            },
+            headers: headers,
             body: formData
         })
         
         console.log('📡 [REVAI WORKER] Response status:', response.status)
         
+        // Handle error responses
         if (!response.ok) {
             const errorText = await response.text()
             console.error('❌ [REVAI WORKER] Submit job failed:', errorText)
             throw new Error(`Failed to submit job: ${response.status} - ${errorText}`)
         }
         
+        // Parse successful response to get job ID
         const job = await response.json()
         console.log('✅ [REVAI WORKER] Job submitted successfully:', job.id)
         return job.id
@@ -96,13 +116,16 @@ async function submitJob(audioFile) {
 }
 
 /**
- * Check job status
+ * Check the status of a RevAI transcription job
+ * Returns job status information including completion status
  */
 async function checkJobStatus(jobId) {
+    const headers = {
+        'Authorization': `Bearer ${REVAI_API_KEY}`
+    }
+    
     const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs/${jobId}`, {
-        headers: {
-            'Authorization': `Bearer ${REVAI_API_KEY}`
-        }
+        headers: headers
     })
     
     if (!response.ok) {
@@ -113,14 +136,17 @@ async function checkJobStatus(jobId) {
 }
 
 /**
- * Get transcript
+ * Retrieve the completed transcript from RevAI
+ * This is called once the job status is 'transcribed'
  */
 async function getTranscript(jobId) {
+    const headers = {
+        'Authorization': `Bearer ${REVAI_API_KEY}`,
+        'Accept': 'application/vnd.rev.transcript.v1.0+json'  // Request transcript format
+    }
+    
     const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs/${jobId}/transcript`, {
-        headers: {
-            'Authorization': `Bearer ${REVAI_API_KEY}`,
-            'Accept': 'application/vnd.rev.transcript.v1.0+json'
-        }
+        headers: headers
     })
     
     if (!response.ok) {
