@@ -17,6 +17,54 @@ const REVAI_CONFIG = {
 let currentJobId = null      // Current RevAI job ID being processed
 let pollInterval = null      // Interval timer for polling job status
 let pollAttempts = 0         // Counter for polling attempts
+let startTime = null         // When polling started
+let audioDuration = 0        // Duration of audio in seconds
+
+/**
+ * Calculate estimated progress based on time elapsed and audio duration
+ * RevAI typically takes 1-3x the audio duration to process
+ */
+function calculateEstimatedProgress() {
+    if (!startTime || !audioDuration) return 0.2
+    
+    const elapsedSeconds = (Date.now() - startTime) / 1000
+    const estimatedTotalSeconds = audioDuration * 2.5 // RevAI typically takes 2.5x audio duration
+    
+    // Start at 20% (after upload) and go up to 90% max
+    const progress = Math.min(0.9, 0.2 + (elapsedSeconds / estimatedTotalSeconds) * 0.7)
+    return Math.max(0.2, progress)
+}
+
+/**
+ * Get user-friendly status message based on progress
+ */
+function getStatusMessage(attempt) {
+    const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000)
+    
+    if (elapsedMinutes < 1) {
+        return 'Processing audio...'
+    } else if (elapsedMinutes < 2) {
+        return `Processing audio... (${elapsedMinutes} minute elapsed)`
+    } else {
+        return `Processing audio... (${elapsedMinutes} minutes elapsed)`
+    }
+}
+
+/**
+ * Get detailed progress information
+ */
+function getProgressDetails(attempt) {
+    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000)
+    const estimatedTotalSeconds = audioDuration * 2.5
+    const remainingSeconds = Math.max(0, estimatedTotalSeconds - elapsedSeconds)
+    
+    if (remainingSeconds > 60) {
+        const remainingMinutes = Math.ceil(remainingSeconds / 60)
+        return `Estimated ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''} remaining`
+    } else {
+        return `Estimated ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''} remaining`
+    }
+}
 
 /**
  * Convert audio data to WAV file format for upload
@@ -202,40 +250,57 @@ function convertTranscript(revTranscript) {
 }
 
 /**
- * Poll for job completion
+ * Start polling for job completion with improved progress tracking
  */
 async function startPolling(jobId) {
     console.log('🔄 [REVAI WORKER] Starting polling for job:', jobId)
     currentJobId = jobId
     pollAttempts = 0
+    startTime = Date.now() // Record when polling started
     
     const poll = async () => {
         try {
             pollAttempts++
             
+            // Check for timeout (prevent infinite polling)
             if (pollAttempts > REVAI_CONFIG.MAX_POLL_ATTEMPTS) {
                 throw new Error('Job polling timeout - transcription took too long')
             }
             
+            // Check current job status
             const jobStatus = await checkJobStatus(jobId)
             console.log(' [REVAI WORKER] Job status:', jobStatus.status, `(attempt ${pollAttempts})`)
             
-            // Update progress
-            const progress = Math.min(0.9, pollAttempts / REVAI_CONFIG.MAX_POLL_ATTEMPTS)
+            // Calculate estimated progress and send update
+            const estimatedProgress = calculateEstimatedProgress()
+            const statusMessage = getStatusMessage(pollAttempts)
+            const progressDetails = getProgressDetails(pollAttempts)
+            
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'loading',
-                progress: progress,
-                details: `Processing audio... (${pollAttempts}/${REVAI_CONFIG.MAX_POLL_ATTEMPTS})`
+                progress: estimatedProgress,
+                details: `${statusMessage} - ${progressDetails}`
             })
             
+            // Handle different job statuses
             if (jobStatus.status === 'transcribed') {
-                // Job complete, get transcript
+                // Job completed successfully - get transcript
                 clearInterval(pollInterval)
                 console.log('✅ [REVAI WORKER] Job completed, getting transcript...')
+                
+                // Send final progress update
+                self.postMessage({
+                    type: MessageTypes.LOADING,
+                    status: 'loading',
+                    progress: 0.95,
+                    details: 'Retrieving transcript...'
+                })
+                
                 const transcript = await getTranscript(jobId)
                 const results = convertTranscript(transcript)
                 
+                // Send results back to main thread
                 self.postMessage({
                     type: MessageTypes.RESULT,
                     results: results,
@@ -243,15 +308,18 @@ async function startPolling(jobId) {
                     completedUntilTimestamp: results[results.length - 1]?.end || 0
                 })
                 
+                // Signal completion
                 self.postMessage({ type: MessageTypes.INFERENCE_DONE })
                 
             } else if (jobStatus.status === 'failed') {
+                // Job failed - report error
                 clearInterval(pollInterval)
                 throw new Error(`Transcription failed: ${jobStatus.failure_detail || 'Unknown error'}`)
             }
             // Continue polling for 'in_progress' status
             
         } catch (error) {
+            // Handle polling errors
             clearInterval(pollInterval)
             console.error('❌ [REVAI WORKER] Polling error:', error)
             self.postMessage({
@@ -262,22 +330,27 @@ async function startPolling(jobId) {
         }
     }
     
+    // Set up polling interval and start immediately
     pollInterval = setInterval(poll, REVAI_CONFIG.POLL_INTERVAL)
     poll() // Start immediately
 }
 
 /**
- * Main transcription function
+ * Main transcription function with audio duration tracking
  */
 async function transcribe(audioData) {
     try {
         console.log('🎯 [REVAI WORKER] Starting transcription process...')
         
-        // Convert audio data to file
+        // Calculate audio duration for progress estimates
+        audioDuration = Math.round(audioData.length / 16000) // 16kHz sample rate
+        console.log('⏱️ [REVAI WORKER] Audio duration:', audioDuration, 'seconds')
+        
+        // Convert raw audio data to WAV file for upload
         const audioFile = audioDataToFile(audioData)
         console.log('📁 [REVAI WORKER] Audio file created:', audioFile.name, audioFile.size, 'bytes')
         
-        // Submit job
+        // Send initial progress update
         self.postMessage({
             type: MessageTypes.LOADING,
             status: 'loading',
@@ -285,19 +358,22 @@ async function transcribe(audioData) {
             details: 'Uploading audio to Rev AI...'
         })
         
+        // Submit job to RevAI and get job ID
         const jobId = await submitJob(audioFile)
         
+        // Update progress after successful submission
         self.postMessage({
             type: MessageTypes.LOADING,
             status: 'loading',
             progress: 0.2,
-            details: 'Job submitted, starting transcription...'
+            details: `Job submitted successfully. Estimated processing time: ${Math.ceil(audioDuration * 2.5 / 60)} minutes`
         })
         
-        // Start polling for results
+        // Start polling for completion
         startPolling(jobId)
         
     } catch (error) {
+        // Handle transcription errors
         console.error('❌ [REVAI WORKER] Transcription error:', error.message)
         self.postMessage({
             type: MessageTypes.LOADING,
