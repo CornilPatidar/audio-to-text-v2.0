@@ -29,7 +29,7 @@ A modern audio transcription application powered by Rev AI. Transform your audio
 ### Performance & Processing
 - **Web Workers** - Background processing for non-blocking API operations
 - **HTTP API Integration** - Efficient communication with Rev AI servers
-- **Real-time Status Polling** - Live progress updates during transcription
+- **Real-time Status Polling** - Live progress updates during transcription. 
 
 ### Deployment & Infrastructure
 - **Vercel** - Edge deployment platform for optimal global performance
