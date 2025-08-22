@@ -74,7 +74,7 @@ export default function FileDisplay(props) {
                     }}
                     disabled={isTranscribing}
                     className={`specialBtn px-3 p-2 rounded-lg flex items-center gap-2 font-medium ${
-                        isTranscribing 
+                        isTranscribing
                             ? 'text-gray-400 cursor-not-allowed' 
                             : 'text-red-400 hover:text-red-600'
                     }`}

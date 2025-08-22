@@ -47,15 +47,16 @@ function App() {
   }
 
   const worker = useRef(null)
+  const [apiKey, setApiKey] = useState(import.meta.env.VITE_REVAI_API_KEY || '')
 
   useEffect(() => {
     // Create worker once and keep it alive
     if (!worker.current) {
-      worker.current = new Worker(new URL('./utils/whisper.worker', import.meta.url), {
+      worker.current = new Worker(new URL('./utils/revai.worker', import.meta.url), {
         type: 'module'
       })
       
-      console.log('🔧 [APP] Worker created')
+      console.log('🔧 [APP] Rev AI Worker created')
     }
 
     const onMessageReceived = async (e) => {
@@ -253,7 +254,7 @@ function App() {
       worker.current.postMessage({
         type: MessageTypes.INFERENCE_REQUEST,
         audio,
-        model_name
+        apiKey
       })
       
       console.log('✅ Processing started...')
