@@ -132,16 +132,15 @@ export default function LoginButton() {
       const windowWidth = window.innerWidth
       const windowHeight = window.innerHeight
       
-      // Mobile-first approach with better width calculation
+      // Force center positioning on mobile and ensure it fits
       const isMobile = windowWidth < 640
-      const dropdownWidth = isMobile ? Math.min(280, windowWidth - 16) : 224 // Ensure it fits on mobile
-      const margin = 8 // 8px margin from screen edge
       
-      // Always use center positioning on mobile for better UX
       if (isMobile) {
         setDropdownPosition('center')
       } else {
         // Desktop logic
+        const dropdownWidth = 224
+        const margin = 8
         if (rect.right + dropdownWidth > windowWidth - margin) {
           setDropdownPosition('left')
         } else if (rect.left - dropdownWidth < margin) {
@@ -151,9 +150,9 @@ export default function LoginButton() {
         }
       }
       
-      // Check vertical positioning with better height estimation
-      const dropdownHeight = isMobile ? 500 : 400 // Slightly higher for mobile due to more content
-      if (rect.bottom + dropdownHeight > windowHeight - margin) {
+      // Check vertical positioning
+      const dropdownHeight = isMobile ? 500 : 400
+      if (rect.bottom + dropdownHeight > windowHeight - 8) {
         document.body.classList.add('dropdown-above')
       } else {
         document.body.classList.remove('dropdown-above')
@@ -191,7 +190,7 @@ export default function LoginButton() {
 
       {showDropdown && (
         <>
-                                                                 <div className={`absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} w-[calc(100vw-2rem)] sm:w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-w-[280px] overflow-hidden`}>
+                                                                 <div className={`${window.innerWidth < 640 ? 'fixed left-4 right-4 top-20' : `absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'}`} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`}>
                           <div className="p-2 sm:p-3 max-h-[80vh] overflow-y-auto">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs mb-3">
