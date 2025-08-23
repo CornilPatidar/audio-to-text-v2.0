@@ -138,9 +138,9 @@ export default function LoginButton() {
       if (isMobile) {
         setDropdownPosition('center')
       } else {
-        // Desktop logic
-        const dropdownWidth = 224
-        const margin = 8
+        // Desktop logic - updated to use 280px width
+        const dropdownWidth = 280
+        const margin = 16
         if (rect.right + dropdownWidth > windowWidth - margin) {
           setDropdownPosition('left')
         } else if (rect.left - dropdownWidth < margin) {
@@ -190,8 +190,15 @@ export default function LoginButton() {
 
       {showDropdown && (
         <>
-                                                                 <div className={`${window.innerWidth < 640 ? 'fixed left-4 right-4 top-20' : `absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'}`} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`}>
-                          <div className="p-2 sm:p-3 max-h-[80vh] overflow-y-auto">
+                                                                                                                                   <div className={`absolute right-0 ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`} style={{
+                        width: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px',
+                        left: window.innerWidth < 640 ? '16px' : undefined,
+                        right: window.innerWidth < 640 ? '16px' : undefined,
+                        position: window.innerWidth < 640 ? 'fixed' : 'absolute',
+                        top: window.innerWidth < 640 ? '80px' : undefined,
+                        maxWidth: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px'
+                      }}>
+                                                     <div className="p-2 sm:p-3 max-h-[60vh] sm:max-h-[80vh] overflow-y-auto">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs mb-3">
                   {error}
@@ -205,12 +212,12 @@ export default function LoginButton() {
               
               {!showCustomForm ? (
                 <>
-                                                                           <div className="space-y-2 sm:space-y-2">
+                                                                           <div className="space-y-1.5 sm:space-y-2">
                       <button
                         type="button"
                         onClick={handleGoogleLogin}
                         disabled={loading}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <i className="fa-brands fa-google text-red-500"></i>
                         {loading ? 'Signing in...' : 'Continue with Google'}
@@ -220,7 +227,7 @@ export default function LoginButton() {
                         type="button"
                         onClick={handleGithubLogin}
                         disabled={loading}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <i className="fa-brands fa-github"></i>
                         {loading ? 'Signing in...' : 'Continue with GitHub'}
@@ -234,14 +241,14 @@ export default function LoginButton() {
                           clearError()
                         }}
                         aria-label="Sign in with email"
-                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                       >
                         <i className="fa-solid fa-envelope text-gray-500"></i>
                         Sign in with email
                       </button>
                     </div>
 
-                   <div className="relative my-3">
+                   <div className="relative my-2 sm:my-3">
                      <div className="absolute inset-0 flex items-center">
                        <div className="w-full border-t border-gray-300" />
                      </div>
@@ -250,7 +257,7 @@ export default function LoginButton() {
                      </div>
                    </div>
 
-                                       <div className="space-y-2 sm:space-y-2">
+                                       <div className="space-y-1.5 sm:space-y-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -258,7 +265,7 @@ export default function LoginButton() {
                           setIsRegistering(true)
                           clearError()
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                       >
                         <i className="fa-solid fa-user-plus text-sm"></i>
                         Create new account
