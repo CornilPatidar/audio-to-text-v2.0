@@ -12,6 +12,7 @@ A modern audio transcription application powered by Rev AI. Transform your audio
 - ⚡ **Fast & Reliable** - No model downloads, immediate processing with professional uptime
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
 - 🚀 **Enterprise Features** - Speaker diarization, custom vocabulary, and multiple output formats
+- 📤 **Multiple Export Formats** - Export transcriptions as TXT, PDF, DOCX, JSON, SRT, or VTT files
 
 ## 🛠️ Technology Stack
 
@@ -42,6 +43,7 @@ A modern audio transcription application powered by Rev AI. Transform your audio
 3. **Cloud Processing** - Rev AI's professional models transcribe the audio with high accuracy
 4. **Status Monitoring** - Real-time progress updates via API polling
 5. **Results Display** - Transcribed text is displayed with timestamps and speaker information
+6. **Export Options** - Download results in multiple formats including TXT, PDF, DOCX, JSON, SRT, and VTT
 
 ## 🔐 Privacy & Security
 
@@ -63,12 +65,23 @@ A modern audio transcription application powered by Rev AI. Transform your audio
 - **Service**: Rev AI Professional Speech-to-Text API
 - **Accuracy**: 99%+ transcription accuracy
 - **Languages**: 100+ languages supported with automatic detection
-- **Features**: Speaker diarization, custom vocabulary, multiple output formats
+- **Features**: Speaker diarization, custom vocabulary, multiple output formats, export options
 
 ### Setup Required
 - **API Key**: Get your free Rev AI API key at [rev.ai](https://rev.ai)
 - **Account**: Free tier includes 5 hours of transcription per month
 - **File Limits**: Supports audio files up to 2GB in size
+
+## 📤 Export Formats
+
+The application supports exporting transcriptions in multiple formats:
+
+- **TXT** - Plain text format for simple text extraction
+- **JSON** - Structured data with timestamps, speaker information, and metadata
+- **SRT** - SubRip subtitle format compatible with video players
+- **VTT** - WebVTT format for web video text tracks
+- **DOCX** - HTML file that opens in Microsoft Word with formatting
+- **PDF** - Portable document format with professional layout
 
 ---
 

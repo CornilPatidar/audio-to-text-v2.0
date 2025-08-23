@@ -1,5 +1,6 @@
 import React from 'react'
 import Transcription from './Transcription'
+import ExportOptions from './ExportOptions'
 
 export default function Information(props) {
     const { output, finished } = props
@@ -14,13 +15,8 @@ export default function Information(props) {
         navigator.clipboard.writeText(textElement)
     }
 
-    function handleDownload() {
-        const element = document.createElement("a")
-        const file = new Blob([textElement], { type: 'text/plain' })
-        element.href = URL.createObjectURL(file)
-        element.download = `AudioTextly_${new Date().toString()}.txt`
-        document.body.appendChild(element)
-        element.click()
+    function handleExportSuccess(format, filename) {
+        console.log(`✅ Exported successfully as ${format}: ${filename}`)
     }
 
 
@@ -41,13 +37,15 @@ export default function Information(props) {
                 )}
                 <Transcription {...props} textElement={textElement} />
             </div>
-            <div className='flex items-center gap-4 mx-auto '>
-                <button onClick={handleCopy} title="Copy" className='bg-white  hover:text-red-500 duration-200 text-red-300 px-2 aspect-square grid place-items-center rounded'>
+            <div className='flex items-center gap-4 mx-auto'>
+                <button onClick={handleCopy} title="Copy to clipboard" className='bg-white hover:text-red-500 duration-200 text-red-300 px-3 py-2 rounded flex items-center gap-2'>
                     <i className="fa-solid fa-copy"></i>
+                    <span className="hidden sm:inline">Copy</span>
                 </button>
-                <button onClick={handleDownload} title="Download" className='bg-white  hover:text-red-500 duration-200 text-red-300 px-2 aspect-square grid place-items-center rounded'>
-                    <i className="fa-solid fa-download"></i>
-                </button>
+                <ExportOptions 
+                    segments={output} 
+                    onExport={handleExportSuccess}
+                />
             </div>
         </main>
     )
