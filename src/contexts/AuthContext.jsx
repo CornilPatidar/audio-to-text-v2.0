@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { auth, onAuthStateChange, signInWithGoogle, signInWithGithub, signOutUser } from '../utils/firebase'
+import { getRedirectResult } from 'firebase/auth'
 
 const AuthContext = createContext()
 
@@ -17,6 +18,20 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        // Check for redirect result first
+        const redirectResult = await getRedirectResult(auth)
+        if (redirectResult) {
+          console.log('User signed in via redirect:', redirectResult.user)
+        }
+      } catch (error) {
+        console.error('Error handling redirect result:', error)
+      }
+    }
+
+    initializeAuth()
+
     const unsubscribe = onAuthStateChange((user) => {
       console.log('Auth state changed:', user ? 'User logged in' : 'User logged out')
       setUser(user)

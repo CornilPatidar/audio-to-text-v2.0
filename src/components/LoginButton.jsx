@@ -7,13 +7,15 @@ export default function LoginButton() {
   const [dropdownPosition, setDropdownPosition] = useState('right')
   const buttonRef = useRef(null)
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (e) => {
+    e?.preventDefault()
     clearError()
     setShowDropdown(false)
     await loginWithGoogle()
   }
 
-  const handleGithubLogin = async () => {
+  const handleGithubLogin = async (e) => {
+    e?.preventDefault()
     clearError()
     setShowDropdown(false)
     await loginWithGithub()
@@ -61,7 +63,8 @@ export default function LoginButton() {
 
   return (
     <div className="relative flex items-center gap-2">
-                                                                                                               <button
+                                                                                                                                                                       <button
+            type="button"
             onClick={handleDropdownToggle}
             className="flex items-center gap-2 specialBtn px-3 py-2 rounded-lg text-red-400 hover:text-red-500 transition-all duration-200 hover:-translate-y-0.5"
           >
@@ -69,7 +72,8 @@ export default function LoginButton() {
             <span className="text-sm font-medium">Log In</span>
           </button>
         
-                                                                                                                                                                                                                                                                 <button
+                                                                                                                                                                                                                                                                  <button
+               type="button"
                ref={buttonRef}
                onClick={handleDropdownToggle}
                className="flex items-center gap-2 bg-red-500 text-white hover:bg-red-600 transition-all duration-200 px-3 py-2 rounded-lg shadow-lg shadow-red-500/50 hover:-translate-y-0.5"
@@ -94,23 +98,25 @@ export default function LoginButton() {
                )}
               
               <div className="space-y-2">
-                <button
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <i className="fa-brands fa-google text-red-500"></i>
-                  {loading ? 'Signing in...' : 'Continue with Google'}
-                </button>
+                                 <button
+                   type="button"
+                   onClick={handleGoogleLogin}
+                   disabled={loading}
+                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   <i className="fa-brands fa-google text-red-500"></i>
+                   {loading ? 'Signing in...' : 'Continue with Google'}
+                 </button>
 
-                <button
-                  onClick={handleGithubLogin}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <i className="fa-brands fa-github"></i>
-                  {loading ? 'Signing in...' : 'Continue with GitHub'}
-                </button>
+                 <button
+                   type="button"
+                   onClick={handleGithubLogin}
+                   disabled={loading}
+                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   <i className="fa-brands fa-github"></i>
+                   {loading ? 'Signing in...' : 'Continue with GitHub'}
+                 </button>
               </div>
 
               <div className="mt-3 pt-3 border-t border-gray-200">

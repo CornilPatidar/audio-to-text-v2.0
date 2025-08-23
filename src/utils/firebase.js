@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics } from "firebase/analytics"
-import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth'
 
 // Firebase configuration
 // You'll need to replace these with your actual Firebase config values
@@ -45,6 +45,18 @@ export const signInWithGoogle = async () => {
   } catch (error) {
     console.error('Google sign-in error:', error)
     
+    // If popup fails, try redirect
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+      try {
+        console.log('Popup failed, trying redirect method...')
+        await signInWithRedirect(auth, googleProvider)
+        return { success: true, redirect: true }
+      } catch (redirectError) {
+        console.error('Redirect also failed:', redirectError)
+        return { success: false, error: 'Both popup and redirect methods failed. Please allow popups or try again.' }
+      }
+    }
+    
     let errorMessage = 'Authentication failed'
     if (error.code === 'auth/popup-closed-by-user') {
       errorMessage = 'Sign-in was cancelled. Please try again.'
@@ -69,6 +81,18 @@ export const signInWithGithub = async () => {
     return { success: true, user: result.user }
   } catch (error) {
     console.error('GitHub sign-in error:', error)
+    
+    // If popup fails, try redirect
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+      try {
+        console.log('Popup failed, trying redirect method...')
+        await signInWithRedirect(auth, githubProvider)
+        return { success: true, redirect: true }
+      } catch (redirectError) {
+        console.error('Redirect also failed:', redirectError)
+        return { success: false, error: 'Both popup and redirect methods failed. Please allow popups or try again.' }
+      }
+    }
     
     let errorMessage = 'Authentication failed'
     if (error.code === 'auth/popup-closed-by-user') {
