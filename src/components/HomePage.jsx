@@ -100,11 +100,16 @@ export default function HomePage(props) {
         return () => clearInterval(interval)
     })
 
+    const handleFileUpload = (e) => {
+        const tempFile = e.target.files[0]
+        setFile(tempFile)
+    }
 
     return (
-        <main className='flex-1  p-4 flex flex-col gap-3 text-center sm:gap-4  justify-center pb-20'>
+        <main className='flex-1 p-4 flex flex-col gap-3 text-center sm:gap-4 justify-center pb-20'>
             <h1 className='font-semibold text-5xl sm:text-6xl md:text-7xl'>Audio<span className='text-red-400 bold'>Textly</span></h1>
             <h3 className='font-medium md:text-lg'>Record or Upload <span className='text-red-400'>&rarr;</span> Transcribe</h3>
+            
             <button onClick={recordingStatus === 'recording' ? stopRecording : startRecording} className='flex specialBtn px-4 py-2 rounded-xl items-center text-base justify-between gap-4 mx-auto w-72 max-w-full my-4'>
                 <p className='text-red-400'>{recordingStatus === 'inactive' ? 'Record' : `Stop recording`}</p>
                 <div className='flex items-center gap-2'>
@@ -117,11 +122,21 @@ export default function HomePage(props) {
             {recordingStatus === 'recording' && (
                 <p className='text-sm text-red-500 animate-pulse'>🔴 Recording... Speak clearly into your microphone</p>
             )}
-            <p className='text-base'>Or <label className='text-red-400 cursor-pointer hover:text-red-600 duration-200'>Upload <input onChange={(e) => {
-                const tempFile = e.target.files[0]
-                setFile(tempFile)
-            }} className='hidden' type='file' accept='.mp3,.mp4' /></label> a mp3/mp4 file</p>
             
+            <p className='text-base'>Or <label className='text-red-400 cursor-pointer hover:text-red-600 duration-200'>Upload <input onChange={handleFileUpload} className='hidden' type='file' accept='audio/*,video/*' /></label> an audio or video file</p>
+            
+            {/* Format Recommendations */}
+            <div className='max-w-md mx-auto mt-2'>
+                <details className='text-xs text-gray-500'>
+                    <summary className='cursor-pointer hover:text-red-400 duration-200'>Recommended formats</summary>
+                    <div className='mt-2 text-left bg-gray-50 rounded p-3'>
+                        <p className='font-semibold mb-1'>Best Quality:</p>
+                        <p className='mb-2'>FLAC, ALAC (lossless)</p>
+                        <p className='font-semibold mb-1'>Good Quality:</p>
+                        <p>MP3, AAC (192+ Kbps)</p>
+                    </div>
+                </details>
+            </div>
         </main>
     )
 }

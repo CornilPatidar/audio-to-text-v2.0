@@ -3,7 +3,7 @@ import Transcription from './Transcription'
 import ExportOptions from './ExportOptions'
 
 export default function Information(props) {
-    const { output, finished } = props
+    const { output, finished, jobId, worker, apiKey } = props
     console.log('📊 Information component - output:', output)
     console.log('📊 Information component - finished:', finished)
 
@@ -45,6 +45,9 @@ export default function Information(props) {
                 <ExportOptions 
                     segments={output} 
                     onExport={handleExportSuccess}
+                    jobId={jobId}
+                    worker={worker}
+                    apiKey={apiKey}
                 />
             </div>
         </main>

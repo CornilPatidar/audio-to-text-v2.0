@@ -196,6 +196,8 @@ export function getFileExtension(format) {
         json: 'json',
         srt: 'srt',
         vtt: 'vtt',
+        revai_srt: 'srt',
+        revai_vtt: 'vtt',
         docx: 'html', // We're creating HTML that can be opened in Word
         pdf: 'pdf'
     }
@@ -211,6 +213,8 @@ export function getMimeType(format) {
         json: 'application/json',
         srt: 'text/plain',
         vtt: 'text/plain',
+        revai_srt: 'text/plain',
+        revai_vtt: 'text/plain',
         docx: 'text/html',
         pdf: 'application/pdf'
     }

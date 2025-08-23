@@ -120,15 +120,56 @@ function audioDataToFile(audioData, fileName = 'audio.wav') {
  * Submit audio file to RevAI for transcription
  * This function uploads the audio file and returns a job ID for tracking
  */
-async function submitJob(audioFile) {
+async function submitJob(audioFile, options = {}) {
+    const { customVocabulary = [], rush = false, verbatim = false, humanTranscription = false, model = 'reverb' } = options
+    
     console.log(' [REVAI WORKER] Submitting job to:', `${REVAI_CONFIG.BASE_URL}/jobs`)
     console.log(' [REVAI WORKER] API Key present:', !!REVAI_API_KEY)
     console.log('🌍 [REVAI WORKER] Environment:', isDevelopment ? 'Development' : 'Production')
+    
+    if (customVocabulary.length > 0) {
+        console.log('📝 [REVAI WORKER] Custom vocabulary provided:', customVocabulary)
+    }
+    if (rush) {
+        console.log('⚡ [REVAI WORKER] Rush processing enabled')
+    }
+    if (verbatim) {
+        console.log('📝 [REVAI WORKER] Verbatim transcription enabled')
+    }
+    if (humanTranscription) {
+        console.log('👤 [REVAI WORKER] Human transcription enabled')
+    }
+    console.log('🤖 [REVAI WORKER] Model:', model)
     
     // Create FormData for file upload
     const formData = new FormData()
     formData.append('media', audioFile)                       // Audio file
     formData.append('metadata', 'Audio transcription from web app')  // Optional metadata
+    
+    // Add custom vocabulary if provided (correct Rev AI format)
+    if (customVocabulary.length > 0) {
+        const customVocabulariesArray = customVocabulary.map(phrase => ({
+            phrase: phrase.trim()
+        }));
+        formData.append('custom_vocabularies', JSON.stringify(customVocabulariesArray))
+    }
+    
+    // Add advanced options with correct Rev AI parameter names
+    if (rush) {
+        formData.append('rush', 'true')
+    }
+    if (verbatim) {
+        formData.append('verbatim', 'true')
+    }
+    
+    // Set transcriber based on model selection and human option
+    if (humanTranscription) {
+        formData.append('transcriber', 'human')
+    } else if (model === 'reverb_turbo') {
+        formData.append('transcriber', 'low_cost')  // Reverb Turbo = low_cost
+    } else {
+        formData.append('transcriber', 'machine')   // Reverb ASR = machine (default)
+    }
     
     try {
         // Prepare headers based on environment
@@ -149,7 +190,24 @@ async function submitJob(audioFile) {
         if (!response.ok) {
             const errorText = await response.text()
             console.error('❌ [REVAI WORKER] Submit job failed:', errorText)
-            throw new Error(`Failed to submit job: ${response.status} - ${errorText}`)
+            
+            // Provide specific error messages for common Rev AI issues
+            let errorMessage = `Failed to submit job: ${response.status}`
+            if (response.status === 400) {
+                errorMessage = 'Bad Request: Please check your file format and settings. Ensure file is a valid audio/video format.'
+            } else if (response.status === 401) {
+                errorMessage = 'Authorization failed: Please check your Rev AI API key.'
+            } else if (response.status === 403) {
+                errorMessage = 'Access forbidden: You do not have permission to use this service.'
+            } else if (response.status === 413) {
+                errorMessage = 'File too large: Maximum size is 2GB for direct upload. Consider using source_config for larger files.'
+            } else if (response.status === 429) {
+                errorMessage = 'Rate limit exceeded: Please wait a moment and try again.'
+            } else {
+                errorMessage += ` - ${errorText}`
+            }
+            
+            throw new Error(errorMessage)
         }
         
         // Parse successful response to get job ID
@@ -177,7 +235,18 @@ async function checkJobStatus(jobId) {
     })
     
     if (!response.ok) {
-        throw new Error(`Failed to check job status: ${response.statusText}`)
+        // Enhanced error handling based on Rev AI API documentation
+        let errorMessage = `Failed to check job status: ${response.status}`
+        if (response.status === 401) {
+            errorMessage = 'Authorization failed: Please check your Rev AI API key.'
+        } else if (response.status === 403) {
+            errorMessage = 'Access forbidden: You do not have permission to access this job.'
+        } else if (response.status === 404) {
+            errorMessage = 'Job not found: The transcription job may have been deleted or does not exist.'
+        } else {
+            errorMessage += ` - ${response.statusText}`
+        }
+        throw new Error(errorMessage)
     }
     
     return await response.json()
@@ -198,10 +267,63 @@ async function getTranscript(jobId) {
     })
     
     if (!response.ok) {
-        throw new Error(`Failed to get transcript: ${response.statusText}`)
+        // Enhanced error handling based on Rev AI API documentation
+        let errorMessage = `Failed to get transcript: ${response.status}`
+        if (response.status === 401) {
+            errorMessage = 'Authorization failed: Please check your Rev AI API key.'
+        } else if (response.status === 403) {
+            errorMessage = 'Access forbidden: You do not have permission to access this transcript.'
+        } else if (response.status === 404) {
+            errorMessage = 'Transcript not found: Job may not exist or not be completed yet.'
+        } else if (response.status === 406) {
+            errorMessage = 'Invalid transcript format requested.'
+        } else if (response.status === 409) {
+            errorMessage = 'Conflict: Job may still be in progress or failed.'
+        } else {
+            errorMessage += ` - ${response.statusText}`
+        }
+        throw new Error(errorMessage)
     }
     
     return await response.json()
+}
+
+/**
+ * Retrieve captions from RevAI in SRT or VTT format
+ * This provides native caption output from Rev AI
+ */
+async function getCaptions(jobId, format = 'srt') {
+    const headers = {
+        'Authorization': `Bearer ${REVAI_API_KEY}`,
+        'Accept': format === 'vtt' ? 'text/vtt' : 'application/x-subrip'  // SRT is default
+    }
+    
+    const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs/${jobId}/captions`, {
+        headers: headers
+    })
+    
+    if (!response.ok) {
+        // Enhanced error handling based on Rev AI API documentation
+        let errorMessage = `Failed to get captions: ${response.status}`
+        if (response.status === 401) {
+            errorMessage = 'Authorization failed: Please check your Rev AI API key.'
+        } else if (response.status === 403) {
+            errorMessage = 'Access forbidden: You do not have permission to access this deployment.'
+        } else if (response.status === 404) {
+            errorMessage = 'Job not found: The transcription job may not exist.'
+        } else if (response.status === 405) {
+            errorMessage = 'Invalid job property: This job may not support captions.'
+        } else if (response.status === 406) {
+            errorMessage = 'Invalid caption format requested.'
+        } else if (response.status === 409) {
+            errorMessage = 'Conflict: Job may still be in progress or failed.'
+        } else {
+            errorMessage += ` - ${response.statusText}`
+        }
+        throw new Error(errorMessage)
+    }
+    
+    return await response.text()
 }
 
 /**
@@ -305,11 +427,15 @@ async function startPolling(jobId) {
                     type: MessageTypes.RESULT,
                     results: results,
                     isDone: true,
-                    completedUntilTimestamp: results[results.length - 1]?.end || 0
+                    completedUntilTimestamp: results[results.length - 1]?.end || 0,
+                    jobId: jobId
                 })
                 
                 // Signal completion
-                self.postMessage({ type: MessageTypes.INFERENCE_DONE })
+                self.postMessage({ 
+                    type: MessageTypes.INFERENCE_DONE,
+                    jobId: jobId
+                })
                 
             } else if (jobStatus.status === 'failed') {
                 // Job failed - report error
@@ -338,7 +464,9 @@ async function startPolling(jobId) {
 /**
  * Main transcription function with audio duration tracking
  */
-async function transcribe(audioData) {
+async function transcribe(audioData, options = {}) {
+    const { customVocabulary = [], rush = false, verbatim = false, humanTranscription = false, model = 'reverb' } = options
+    
     try {
         console.log('🎯 [REVAI WORKER] Starting transcription process...')
         
@@ -359,14 +487,15 @@ async function transcribe(audioData) {
         })
         
         // Submit job to RevAI and get job ID
-        const jobId = await submitJob(audioFile)
+        const jobId = await submitJob(audioFile, { customVocabulary, rush, verbatim, humanTranscription, model })
         
         // Update progress after successful submission
+        const processingTime = humanTranscription ? '12-24 hours' : `${Math.ceil(audioDuration * 2.5 / 60)} minutes`
         self.postMessage({
             type: MessageTypes.LOADING,
             status: 'loading',
             progress: 0.2,
-            details: `Job submitted successfully. Estimated processing time: ${Math.ceil(audioDuration * 2.5 / 60)} minutes`
+            details: `Job submitted successfully. Estimated processing time: ${processingTime}`
         })
         
         // Start polling for completion
@@ -388,7 +517,7 @@ async function transcribe(audioData) {
  */
 self.addEventListener('message', async (event) => {
     if (!event.data || typeof event.data !== 'object') return
-    const { type, audio, apiKey } = event.data
+    const { type, audio, apiKey, customVocabulary, rush, verbatim, humanTranscription, model, jobId, captionFormat } = event.data
 
     if (type === MessageTypes.INFERENCE_REQUEST) {
         // Set API key
@@ -408,7 +537,55 @@ self.addEventListener('message', async (event) => {
         }
         
         console.log('🎯 [REVAI WORKER] Starting transcription...')
-        await transcribe(audio)
+        await transcribe(audio, { 
+            customVocabulary: customVocabulary || [], 
+            rush: rush || false, 
+            verbatim: verbatim || false, 
+            humanTranscription: humanTranscription || false, 
+            model: model || 'reverb' 
+        })
+        
+    } else if (type === MessageTypes.CAPTIONS_REQUEST) {
+        // Handle caption requests
+        if (!REVAI_API_KEY) {
+            console.error('❌ [REVAI WORKER] No API key provided for captions')
+            self.postMessage({
+                type: MessageTypes.LOADING,
+                status: 'error',
+                error: 'Rev AI API key not provided'
+            })
+            return
+        }
+        
+        if (!jobId) {
+            console.error('❌ [REVAI WORKER] No job ID provided for captions')
+            self.postMessage({
+                type: MessageTypes.LOADING,
+                status: 'error',
+                error: 'Job ID not provided'
+            })
+            return
+        }
+        
+        try {
+            console.log('🎯 [REVAI WORKER] Fetching captions...')
+            const captions = await getCaptions(jobId, captionFormat || 'srt')
+            
+            self.postMessage({
+                type: MessageTypes.CAPTIONS_RESULT,
+                captions: captions,
+                format: captionFormat || 'srt',
+                jobId: jobId
+            })
+            
+        } catch (error) {
+            console.error('❌ [REVAI WORKER] Caption fetch error:', error.message)
+            self.postMessage({
+                type: MessageTypes.LOADING,
+                status: 'error',
+                error: error.message
+            })
+        }
         
     } else if (type === 'CANCEL_TRANSCRIPTION') {
         if (pollInterval) {

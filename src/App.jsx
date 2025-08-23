@@ -50,6 +50,7 @@ function AppContent() {
 
   const worker = useRef(null)
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_REVAI_API_KEY || '')
+  const [currentJobId, setCurrentJobId] = useState(null)
 
   useEffect(() => {
     // Create worker once and keep it alive
@@ -163,6 +164,11 @@ function AppContent() {
           setIsTranscribing(false)
           setLoading(false)
           setFinished(true)
+          // Store the job ID for caption requests
+          if (e.data.jobId) {
+            setCurrentJobId(e.data.jobId)
+            console.log('📋 Job ID stored for captions:', e.data.jobId)
+          }
           setProcessingStatus({
             stage: 'complete',
             message: 'Ready to view results',
@@ -215,7 +221,7 @@ function AppContent() {
     return audio
   }
 
-  async function handleFormSubmission() {
+  async function handleFormSubmission(transcriptionData = {}) {
     console.log('🎤 Starting transcription...')
     
     if (!file && !audioStream) { 
@@ -229,6 +235,21 @@ function AppContent() {
     }
 
     console.log('📁 Processing:', file?.name || 'audio stream')
+    
+    // Log advanced options
+    if (transcriptionData.customVocabulary && transcriptionData.customVocabulary.length > 0) {
+      console.log('📝 Custom vocabulary:', transcriptionData.customVocabulary)
+    }
+    if (transcriptionData.rush) {
+      console.log('⚡ Rush processing enabled (+$1.25/minute)')
+    }
+    if (transcriptionData.verbatim) {
+      console.log('📝 Verbatim transcription enabled (+$0.50/minute)')
+    }
+    if (transcriptionData.humanTranscription) {
+      console.log('👤 Human transcription enabled ($1.99/minute)')
+    }
+    console.log('🤖 Model:', transcriptionData.model || 'reverb')
 
     try {
       setIsTranscribing(true)
@@ -256,7 +277,12 @@ function AppContent() {
       worker.current.postMessage({
         type: MessageTypes.INFERENCE_REQUEST,
         audio,
-        apiKey
+        apiKey,
+        customVocabulary: transcriptionData.customVocabulary || [],
+        rush: transcriptionData.rush || false,
+        verbatim: transcriptionData.verbatim || false,
+        humanTranscription: transcriptionData.humanTranscription || false,
+        model: transcriptionData.model || 'reverb'
       })
       
       console.log('✅ Processing started...')
@@ -289,7 +315,13 @@ function AppContent() {
       <section className='min-h-screen flex flex-col'>
         <Header />
         {output ? (
-          <Information output={output} finished={finished}/>
+          <Information 
+            output={output} 
+            finished={finished}
+            jobId={currentJobId}
+            worker={worker.current}
+            apiKey={apiKey}
+          />
         ) : loading ? (
           <Transcribing 
             downloading={downloading} 

@@ -10,7 +10,7 @@ import {
     generateFilename
 } from '../utils/exportFormats'
 
-export default function ExportOptions({ segments, onExport }) {
+export default function ExportOptions({ segments, onExport, jobId, worker, apiKey }) {
     const [isOpen, setIsOpen] = useState(false)
     const [isExporting, setIsExporting] = useState(false)
     const [showSuccess, setShowSuccess] = useState(false)
@@ -21,6 +21,8 @@ export default function ExportOptions({ segments, onExport }) {
         { key: 'json', label: 'JSON (.json)', icon: 'fa-file-code', description: 'Structured data with timestamps' },
         { key: 'srt', label: 'SubRip (.srt)', icon: 'fa-closed-captioning', description: 'Subtitle format for video players' },
         { key: 'vtt', label: 'WebVTT (.vtt)', icon: 'fa-closed-captioning', description: 'Web video text tracks' },
+        { key: 'revai_srt', label: 'Rev AI SRT (.srt)', icon: 'fa-closed-captioning', description: 'Native Rev AI subtitle format', isRevAI: true },
+        { key: 'revai_vtt', label: 'Rev AI VTT (.vtt)', icon: 'fa-closed-captioning', description: 'Native Rev AI web video tracks', isRevAI: true },
         { key: 'docx', label: 'Word Document (.html)', icon: 'fa-file-word', description: 'HTML file that opens in Word' },
         { key: 'pdf', label: 'PDF (.pdf)', icon: 'fa-file-pdf', description: 'Portable document format' }
     ]
@@ -89,6 +91,60 @@ export default function ExportOptions({ segments, onExport }) {
             let content
             let filename = generateFilename(format)
 
+            // Handle Rev AI native caption formats
+            if (format === 'revai_srt' || format === 'revai_vtt') {
+                if (!jobId || !worker || !apiKey) {
+                    throw new Error('Rev AI native captions require a completed transcription job. Please complete a transcription first.')
+                }
+
+                const captionFormat = format === 'revai_srt' ? 'srt' : 'vtt'
+                
+                // Request captions from Rev AI
+                worker.postMessage({
+                    type: 'CAPTIONS_REQUEST',
+                    jobId: jobId,
+                    captionFormat: captionFormat,
+                    apiKey: apiKey
+                })
+
+                // Set up a one-time listener for the response
+                const handleCaptionResponse = (event) => {
+                    if (event.data.type === 'CAPTIONS_RESULT' && event.data.captions) {
+                        // Create and download file
+                        const blob = new Blob([event.data.captions], { type: getMimeType(captionFormat) })
+                        const url = URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.download = filename
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        URL.revokeObjectURL(url)
+
+                        // Call the onExport callback if provided
+                        if (onExport) {
+                            onExport(format, filename)
+                        }
+
+                        // Show success message
+                        setShowSuccess(true)
+                        setTimeout(() => setShowSuccess(false), 3000)
+                        setIsExporting(false)
+
+                        // Remove the listener
+                        worker.removeEventListener('message', handleCaptionResponse)
+                    } else if (event.data.type === 'LOADING' && event.data.status === 'error') {
+                        alert(`Failed to export Rev AI captions: ${event.data.error}`)
+                        setIsExporting(false)
+                        worker.removeEventListener('message', handleCaptionResponse)
+                    }
+                }
+
+                worker.addEventListener('message', handleCaptionResponse)
+                return
+            }
+
+            // Handle local export formats
             switch (format) {
                 case 'txt':
                     content = exportAsTXT(segments)
@@ -176,16 +232,21 @@ export default function ExportOptions({ segments, onExport }) {
                 } ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} w-72 sm:w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto`}>
                     <div className="py-2">
                         {exportFormats.map((format) => (
-                            <button
-                                key={format.key}
-                                onClick={() => handleExport(format.key)}
-                                disabled={isExporting}
-                                className="w-full px-3 sm:px-4 py-3 sm:py-2 text-left hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 sm:gap-3 disabled:opacity-50 disabled:cursor-not-allowed group touch-manipulation"
-                                title={format.description}
-                            >
+                                                            <button
+                                    key={format.key}
+                                    onClick={() => handleExport(format.key)}
+                                    disabled={isExporting || (format.isRevAI && !jobId)}
+                                    className={`w-full px-3 sm:px-4 py-3 sm:py-2 text-left hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 sm:gap-3 disabled:opacity-50 disabled:cursor-not-allowed group touch-manipulation ${
+                                        format.isRevAI && !jobId ? 'opacity-50' : ''
+                                    }`}
+                                    title={format.isRevAI && !jobId ? 'Complete a transcription first to access Rev AI native captions' : format.description}
+                                >
                                 <i className={`fa-solid ${format.icon} text-gray-600 w-4 flex-shrink-0`}></i>
                                 <div className="flex-1 text-left min-w-0">
-                                    <div className="text-sm font-medium truncate">{format.label}</div>
+                                    <div className="text-sm font-medium truncate">
+                                        {format.label}
+                                        {format.isRevAI && <span className="ml-1 text-xs text-blue-600">(Rev AI)</span>}
+                                    </div>
                                     <div className="text-xs text-gray-500 group-hover:text-gray-700 hidden sm:block">{format.description}</div>
                                 </div>
                                 {isExporting && (
