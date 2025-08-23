@@ -12,7 +12,8 @@ export default function LoginButton() {
     email: '',
     password: '',
     confirmPassword: '',
-    name: ''
+    name: '',
+    acceptTerms: false
   })
   const [validationErrors, setValidationErrors] = useState({})
   const buttonRef = useRef(null)
@@ -69,6 +70,10 @@ export default function LoginButton() {
       if (formData.password !== formData.confirmPassword) {
         errors.confirmPassword = 'Passwords do not match'
       }
+
+      if (!formData.acceptTerms) {
+        errors.acceptTerms = 'You must accept the terms and conditions'
+      }
     } else {
       if (!formData.username.trim()) {
         errors.username = 'Username or email is required'
@@ -101,23 +106,23 @@ export default function LoginButton() {
         name: formData.name.trim()
       }
       const result = await register(userData)
-      if (result.success) {
-        setShowDropdown(false)
-        setShowCustomForm(false)
-        setIsRegistering(false)
-        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
-      }
+             if (result.success) {
+         setShowDropdown(false)
+         setShowCustomForm(false)
+         setIsRegistering(false)
+         setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '', acceptTerms: false })
+       }
     } else {
       const credentials = {
         username: formData.username.trim(),
         password: formData.password
       }
-      const result = await login(credentials)
-      if (result.success) {
-        setShowDropdown(false)
-        setShowCustomForm(false)
-        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
-      }
+             const result = await login(credentials)
+       if (result.success) {
+         setShowDropdown(false)
+         setShowCustomForm(false)
+         setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '', acceptTerms: false })
+       }
     }
   }
 
@@ -127,18 +132,28 @@ export default function LoginButton() {
       const windowWidth = window.innerWidth
       const windowHeight = window.innerHeight
       
-      // Check horizontal positioning - use smaller width for mobile
-      const dropdownWidth = windowWidth < 640 ? 280 : 224 // 280px for mobile, 224px for desktop
-      if (rect.right + dropdownWidth > windowWidth) {
-        setDropdownPosition('left')
-      } else if (rect.left - dropdownWidth < 0) {
+      // Mobile-first approach with better width calculation
+      const isMobile = windowWidth < 640
+      const dropdownWidth = isMobile ? Math.min(280, windowWidth - 16) : 224 // Ensure it fits on mobile
+      const margin = 8 // 8px margin from screen edge
+      
+      // Always use center positioning on mobile for better UX
+      if (isMobile) {
         setDropdownPosition('center')
       } else {
-        setDropdownPosition('right')
+        // Desktop logic
+        if (rect.right + dropdownWidth > windowWidth - margin) {
+          setDropdownPosition('left')
+        } else if (rect.left - dropdownWidth < margin) {
+          setDropdownPosition('center')
+        } else {
+          setDropdownPosition('right')
+        }
       }
       
-      // Check vertical positioning
-      if (rect.bottom + 200 > windowHeight) {
+      // Check vertical positioning with better height estimation
+      const dropdownHeight = isMobile ? 500 : 400 // Slightly higher for mobile due to more content
+      if (rect.bottom + dropdownHeight > windowHeight - margin) {
         document.body.classList.add('dropdown-above')
       } else {
         document.body.classList.remove('dropdown-above')
@@ -176,8 +191,8 @@ export default function LoginButton() {
 
       {showDropdown && (
         <>
-          <div className={`absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} w-70 sm:w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-w-[calc(100vw-2rem)]`}>
-            <div className="p-3">
+                                                                 <div className={`absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} w-[calc(100vw-2rem)] sm:w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-w-[280px] overflow-hidden`}>
+                          <div className="p-2 sm:p-3 max-h-[80vh] overflow-y-auto">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs mb-3">
                   {error}
@@ -191,41 +206,41 @@ export default function LoginButton() {
               
               {!showCustomForm ? (
                 <>
-                                     <div className="space-y-2">
-                     <button
-                       type="button"
-                       onClick={handleGoogleLogin}
-                       disabled={loading}
-                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       <i className="fa-brands fa-google text-red-500"></i>
-                       {loading ? 'Signing in...' : 'Continue with Google'}
-                     </button>
+                                                                           <div className="space-y-2 sm:space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <i className="fa-brands fa-google text-red-500"></i>
+                        {loading ? 'Signing in...' : 'Continue with Google'}
+                      </button>
 
-                     <button
-                       type="button"
-                       onClick={handleGithubLogin}
-                       disabled={loading}
-                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       <i className="fa-brands fa-github"></i>
-                       {loading ? 'Signing in...' : 'Continue with GitHub'}
-                     </button>
+                      <button
+                        type="button"
+                        onClick={handleGithubLogin}
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <i className="fa-brands fa-github"></i>
+                        {loading ? 'Signing in...' : 'Continue with GitHub'}
+                      </button>
 
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setShowCustomForm(true)
-                         setIsRegistering(false)
-                         clearError()
-                       }}
-                       aria-label="Sign in with email"
-                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                     >
-                       <i className="fa-solid fa-envelope text-gray-500"></i>
-                       Sign in with email
-                     </button>
-                   </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCustomForm(true)
+                          setIsRegistering(false)
+                          clearError()
+                        }}
+                        aria-label="Sign in with email"
+                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                      >
+                        <i className="fa-solid fa-envelope text-gray-500"></i>
+                        Sign in with email
+                      </button>
+                    </div>
 
                    <div className="relative my-3">
                      <div className="absolute inset-0 flex items-center">
@@ -236,20 +251,20 @@ export default function LoginButton() {
                      </div>
                    </div>
 
-                   <div className="space-y-2">
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setShowCustomForm(true)
-                         setIsRegistering(true)
-                         clearError()
-                       }}
-                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                     >
-                       <i className="fa-solid fa-user-plus text-sm"></i>
-                       Create new account
-                     </button>
-                   </div>
+                                       <div className="space-y-2 sm:space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCustomForm(true)
+                          setIsRegistering(true)
+                          clearError()
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-3 sm:py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                      >
+                        <i className="fa-solid fa-user-plus text-sm"></i>
+                        Create new account
+                      </button>
+                    </div>
 
                    <div className="text-center">
                      <p className="text-xs text-gray-500">
@@ -258,20 +273,20 @@ export default function LoginButton() {
                    </div>
                 </>
               ) : (
-                <form onSubmit={handleCustomSubmit} className="space-y-3">
+                                 <form onSubmit={handleCustomSubmit} className="space-y-4 sm:space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-900">
                       {isRegistering ? 'Create Account' : 'Sign In'}
                     </h3>
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowCustomForm(false)
-                        setIsRegistering(false)
-                        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
-                        setValidationErrors({})
-                        clearError()
-                      }}
+                                             onClick={() => {
+                         setShowCustomForm(false)
+                         setIsRegistering(false)
+                         setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '', acceptTerms: false })
+                         setValidationErrors({})
+                         clearError()
+                       }}
                       className="text-gray-400 hover:text-gray-600"
                     >
                       <i className="fa-solid fa-times"></i>
@@ -289,9 +304,9 @@ export default function LoginButton() {
                         required
                         value={formData.name}
                         onChange={handleInputChange}
-                        className={`w-full px-2 py-1 text-sm border rounded ${
-                          validationErrors.name ? 'border-red-300' : 'border-gray-300'
-                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                                                 className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
+                           validationErrors.name ? 'border-red-300' : 'border-gray-300'
+                         } focus:outline-none focus:ring-1 focus:ring-red-500`}
                         placeholder="Enter your full name"
                       />
                       {validationErrors.name && (
@@ -300,69 +315,71 @@ export default function LoginButton() {
                     </div>
                   )}
 
-                  {isRegistering && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Username
-                      </label>
-                      <input
-                        name="username"
-                        type="text"
-                        required
-                        value={formData.username}
-                        onChange={handleInputChange}
-                        className={`w-full px-2 py-1 text-sm border rounded ${
-                          validationErrors.username ? 'border-red-300' : 'border-gray-300'
-                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
-                        placeholder="Choose a username"
-                      />
-                      {validationErrors.username && (
-                        <p className="text-xs text-red-600 mt-1">{validationErrors.username}</p>
-                      )}
-                    </div>
-                  )}
+                                     {isRegistering && (
+                     <div>
+                       <label className="block text-xs font-medium text-gray-700 mb-1">
+                         Username
+                       </label>
+                       <input
+                         name="username"
+                         type="text"
+                         required
+                         value={formData.username}
+                         onChange={handleInputChange}
+                         className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
+                           validationErrors.username ? 'border-red-300' : 'border-gray-300'
+                         } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                         placeholder="Choose a username"
+                       />
+                       {validationErrors.username && (
+                         <p className="text-xs text-red-600 mt-1">{validationErrors.username}</p>
+                       )}
+                     </div>
+                   )}
 
-                  {isRegistering && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <input
-                        name="email"
-                        type="email"
-                        required
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className={`w-full px-2 py-1 text-sm border rounded ${
-                          validationErrors.email ? 'border-red-300' : 'border-gray-300'
-                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
-                        placeholder="Enter your email"
-                      />
-                      {validationErrors.email && (
-                        <p className="text-xs text-red-600 mt-1">{validationErrors.email}</p>
-                      )}
-                    </div>
-                  )}
+                   {isRegistering && (
+                     <div>
+                       <label className="block text-xs font-medium text-gray-700 mb-1">
+                         Email
+                       </label>
+                       <input
+                         name="email"
+                         type="email"
+                         required
+                         value={formData.email}
+                         onChange={handleInputChange}
+                         className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
+                           validationErrors.email ? 'border-red-300' : 'border-gray-300'
+                         } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                         placeholder="Enter your email"
+                       />
+                       {validationErrors.email && (
+                         <p className="text-xs text-red-600 mt-1">{validationErrors.email}</p>
+                       )}
+                     </div>
+                   )}
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      {isRegistering ? 'Username or Email' : 'Username or Email'}
-                    </label>
-                    <input
-                      name="username"
-                      type="text"
-                      required
-                      value={formData.username}
-                      onChange={handleInputChange}
-                      className={`w-full px-2 py-1 text-sm border rounded ${
-                        validationErrors.username ? 'border-red-300' : 'border-gray-300'
-                      } focus:outline-none focus:ring-1 focus:ring-red-500`}
-                      placeholder={isRegistering ? "Choose a username" : "Enter username or email"}
-                    />
-                    {validationErrors.username && (
-                      <p className="text-xs text-red-600 mt-1">{validationErrors.username}</p>
-                    )}
-                  </div>
+                   {!isRegistering && (
+                     <div>
+                       <label className="block text-xs font-medium text-gray-700 mb-1">
+                         Username or Email
+                       </label>
+                       <input
+                         name="username"
+                         type="text"
+                         required
+                         value={formData.username}
+                         onChange={handleInputChange}
+                         className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
+                           validationErrors.username ? 'border-red-300' : 'border-gray-300'
+                         } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                         placeholder="Enter username or email"
+                       />
+                       {validationErrors.username && (
+                         <p className="text-xs text-red-600 mt-1">{validationErrors.username}</p>
+                       )}
+                     </div>
+                   )}
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -374,7 +391,7 @@ export default function LoginButton() {
                       required
                       value={formData.password}
                       onChange={handleInputChange}
-                      className={`w-full px-2 py-1 text-sm border rounded ${
+                      className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
                         validationErrors.password ? 'border-red-300' : 'border-gray-300'
                       } focus:outline-none focus:ring-1 focus:ring-red-500`}
                       placeholder="Enter your password"
@@ -384,27 +401,53 @@ export default function LoginButton() {
                     )}
                   </div>
 
-                  {isRegistering && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Confirm Password
-                      </label>
-                      <input
-                        name="confirmPassword"
-                        type="password"
-                        required
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        className={`w-full px-2 py-1 text-sm border rounded ${
-                          validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
-                        placeholder="Confirm your password"
-                      />
-                      {validationErrors.confirmPassword && (
-                        <p className="text-xs text-red-600 mt-1">{validationErrors.confirmPassword}</p>
-                      )}
-                    </div>
-                  )}
+                                     {isRegistering && (
+                     <div>
+                       <label className="block text-xs font-medium text-gray-700 mb-1">
+                         Confirm Password
+                       </label>
+                       <input
+                         name="confirmPassword"
+                         type="password"
+                         required
+                         value={formData.confirmPassword}
+                         onChange={handleInputChange}
+                         className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
+                           validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                         } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                         placeholder="Confirm your password"
+                       />
+                       {validationErrors.confirmPassword && (
+                         <p className="text-xs text-red-600 mt-1">{validationErrors.confirmPassword}</p>
+                       )}
+                     </div>
+                   )}
+
+                   {isRegistering && (
+                     <div className="flex items-start gap-2">
+                       <input
+                         type="checkbox"
+                         name="acceptTerms"
+                         id="acceptTerms"
+                         checked={formData.acceptTerms}
+                         onChange={(e) => setFormData(prev => ({ ...prev, acceptTerms: e.target.checked }))}
+                         className="mt-0.5 h-3 w-3 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                       />
+                       <label htmlFor="acceptTerms" className="text-xs text-gray-700">
+                         I agree to the{' '}
+                         <a href="#" className="text-red-600 hover:text-red-500 underline">
+                           Terms of Service
+                         </a>{' '}
+                         and{' '}
+                         <a href="#" className="text-red-600 hover:text-red-500 underline">
+                           Privacy Policy
+                         </a>
+                       </label>
+                     </div>
+                   )}
+                   {isRegistering && validationErrors.acceptTerms && (
+                     <p className="text-xs text-red-600 mt-1">{validationErrors.acceptTerms}</p>
+                   )}
 
                   <button
                     type="submit"
@@ -422,12 +465,12 @@ export default function LoginButton() {
                   <div className="text-center">
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsRegistering(!isRegistering)
-                        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
-                        setValidationErrors({})
-                        clearError()
-                      }}
+                                             onClick={() => {
+                         setIsRegistering(!isRegistering)
+                         setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '', acceptTerms: false })
+                         setValidationErrors({})
+                         clearError()
+                       }}
                       className="text-xs text-red-600 hover:text-red-500"
                     >
                       {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
