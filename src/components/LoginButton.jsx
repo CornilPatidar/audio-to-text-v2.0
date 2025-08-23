@@ -27,17 +27,18 @@ export default function LoginButton() {
       const windowWidth = window.innerWidth
       const windowHeight = window.innerHeight
       
-      // Check horizontal positioning
-      if (rect.right + 224 > windowWidth) { // 224px = w-56 (14rem)
+      // Check horizontal positioning - use smaller width for mobile
+      const dropdownWidth = windowWidth < 640 ? 280 : 224 // 280px for mobile, 224px for desktop
+      if (rect.right + dropdownWidth > windowWidth) {
         setDropdownPosition('left')
-      } else if (rect.left - 224 < 0) {
+      } else if (rect.left - dropdownWidth < 0) {
         setDropdownPosition('center')
       } else {
         setDropdownPosition('right')
       }
       
       // Check vertical positioning
-      if (rect.bottom + 200 > windowHeight) { // Approximate dropdown height
+      if (rect.bottom + 200 > windowHeight) {
         document.body.classList.add('dropdown-above')
       } else {
         document.body.classList.remove('dropdown-above')
@@ -62,29 +63,20 @@ export default function LoginButton() {
   }, [showDropdown])
 
   return (
-    <div className="relative flex items-center gap-1 sm:gap-2">
+    <div className="relative">
       <button
         type="button"
+        ref={buttonRef}
         onClick={handleDropdownToggle}
         className="flex items-center gap-1 sm:gap-2 specialBtn px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-red-400 hover:text-red-500 transition-all duration-200 hover:-translate-y-0.5 text-xs sm:text-sm"
       >
         <i className="fa-solid fa-sign-in-alt text-xs sm:text-sm"></i>
         <span className="text-xs sm:text-sm font-medium">Log In</span>
       </button>
-      
-      <button
-        type="button"
-        ref={buttonRef}
-        onClick={handleDropdownToggle}
-        className="flex items-center gap-1 sm:gap-2 bg-red-500 text-white hover:bg-red-600 transition-all duration-200 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg shadow-lg shadow-red-500/50 hover:-translate-y-0.5 text-xs sm:text-sm"
-      >
-        <i className="fa-solid fa-user-plus text-xs sm:text-sm"></i>
-        <span className="text-xs sm:text-sm font-medium">Sign Up</span>
-      </button>
 
       {showDropdown && (
         <>
-          <div className={`absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50`}>
+          <div className={`absolute ${dropdownPosition === 'right' ? 'right-0' : dropdownPosition === 'left' ? 'left-0' : 'left-1/2 transform -translate-x-1/2'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} w-70 sm:w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-w-[calc(100vw-2rem)]`}>
             <div className="p-3">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs mb-3">
@@ -116,6 +108,21 @@ export default function LoginButton() {
                 >
                   <i className="fa-brands fa-github"></i>
                   {loading ? 'Signing in...' : 'Continue with GitHub'}
+                </button>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500 text-center mb-2">
+                  Don't have an account?
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-white bg-red-500 border border-red-500 rounded-md hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/50"
+                >
+                  <i className="fa-solid fa-user-plus text-sm"></i>
+                  {loading ? 'Signing up...' : 'Sign Up'}
                 </button>
               </div>
 

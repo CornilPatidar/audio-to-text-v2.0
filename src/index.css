@@ -27,6 +27,10 @@ html, body {
     opacity: 0.8;
   }
   
+  .w-70 {
+    width: 17.5rem;
+  }
+  
   .loading {
     animation: width 5s linear infinite;
     margin-right: auto;
