@@ -13,6 +13,7 @@ A modern audio transcription application powered by Rev AI. Transform your audio
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
 - 🚀 **Enterprise Features** - Speaker diarization, custom vocabulary, and multiple output formats
 - 📤 **Multiple Export Formats** - Export transcriptions as TXT, PDF, DOCX, JSON, SRT, or VTT files
+- 🔐 **Secure Authentication** - Sign in with Google, GitHub, or email accounts
 
 ## 🛠️ Technology Stack
 
@@ -26,6 +27,11 @@ A modern audio transcription application powered by Rev AI. Transform your audio
 - **Cloud Processing** - Secure server-side transcription with 99%+ accuracy
 - **Multi-language Support** - Automatic language detection and transcription
 - **Speaker Diarization** - Identify and separate different speakers in audio
+
+### Authentication & Security
+- **Firebase Auth** - Secure authentication with Google, GitHub, and email providers
+- **User Management** - Profile management and session handling
+- **Secure API Keys** - Environment-based configuration for API credentials
 
 ### Performance & Processing
 - **Web Workers** - Background processing for non-blocking API operations
@@ -82,6 +88,38 @@ The application supports exporting transcriptions in multiple formats:
 - **VTT** - WebVTT format for web video text tracks
 - **DOCX** - HTML file that opens in Microsoft Word with formatting
 - **PDF** - Portable document format with professional layout
+
+## 🔐 Authentication Setup
+
+The application uses Firebase Authentication for secure user management. To set up authentication:
+
+### 1. Create a Firebase Project
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project or select an existing one
+3. Enable Authentication in the Firebase console
+
+### 2. Configure Authentication Providers
+1. In Firebase Console, go to Authentication > Sign-in method
+2. Enable Google and GitHub providers
+3. For GitHub, you'll need to create a GitHub OAuth app and add the client ID/secret
+
+### 3. Environment Variables
+Create a `.env` file in the project root with your Firebase configuration:
+
+```env
+VITE_FIREBASE_API_KEY=your-api-key-here
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=your-app-id
+VITE_REVAI_API_KEY=your-revai-api-key-here
+```
+
+### 4. Supported Providers
+- **Google** - One-click sign-in with Google accounts
+- **GitHub** - Sign-in with GitHub accounts
+- **Email/Password** - Traditional email authentication (can be added)
 
 ---
 

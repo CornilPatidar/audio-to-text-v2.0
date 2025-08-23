@@ -1,5 +1,6 @@
 import React from 'react'
 import { useState, useRef, useEffect } from 'react'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import HomePage from './components/HomePage'
 import Header from './components/Header'
 import FileDisplay from './components/FileDisplay'
@@ -8,7 +9,8 @@ import Transcribing from './components/Transcribing'
 import { MessageTypes } from './utils/presets'
 
 
-function App() {
+function AppContent() {
+  const { user, loading: authLoading } = useAuth()
   const [file, setFile] = useState(null)
   const [audioStream, setAudioStream] = useState(null)
   const [output, setOutput] = useState(null)
@@ -270,6 +272,18 @@ function App() {
     }
   }
 
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <i className="fa-solid fa-spinner animate-spin text-4xl text-red-400 mb-4"></i>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className='flex flex-col max-w-[1000px] mx-auto w-full'>
       <section className='min-h-screen flex flex-col'>
@@ -296,6 +310,14 @@ function App() {
       </section>
       <footer></footer>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 
