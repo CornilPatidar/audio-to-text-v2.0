@@ -1,11 +1,14 @@
 import React from 'react'
 import { useState, useRef, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import HomePage from './components/HomePage'
 import Header from './components/Header'
 import FileDisplay from './components/FileDisplay'
 import Information from './components/Information'
 import Transcribing from './components/Transcribing'
+import Login from './components/Login'
+import Register from './components/Register'
 import { MessageTypes } from './utils/presets'
 
 
@@ -345,10 +348,39 @@ function AppContent() {
   )
 }
 
+function MainApp() {
+  const { user, loading: authLoading } = useAuth()
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <i className="fa-solid fa-spinner animate-spin text-4xl text-red-400 mb-4"></i>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If user is not authenticated, redirect to login
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <AppContent />
+}
+
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/" element={<MainApp />} />
+        </Routes>
+      </Router>
     </AuthProvider>
   )
 }
