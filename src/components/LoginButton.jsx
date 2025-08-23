@@ -191,64 +191,71 @@ export default function LoginButton() {
               
               {!showCustomForm ? (
                 <>
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={handleGoogleLogin}
-                      disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <i className="fa-brands fa-google text-red-500"></i>
-                      {loading ? 'Signing in...' : 'Continue with Google'}
-                    </button>
+                                     <div className="space-y-2">
+                     <button
+                       type="button"
+                       onClick={handleGoogleLogin}
+                       disabled={loading}
+                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                       <i className="fa-brands fa-google text-red-500"></i>
+                       {loading ? 'Signing in...' : 'Continue with Google'}
+                     </button>
 
-                    <button
-                      type="button"
-                      onClick={handleGithubLogin}
-                      disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <i className="fa-brands fa-github"></i>
-                      {loading ? 'Signing in...' : 'Continue with GitHub'}
-                    </button>
-                  </div>
+                     <button
+                       type="button"
+                       onClick={handleGithubLogin}
+                       disabled={loading}
+                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                       <i className="fa-brands fa-github"></i>
+                       {loading ? 'Signing in...' : 'Continue with GitHub'}
+                     </button>
 
-                  <div className="relative my-3">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500">Or</span>
-                    </div>
-                  </div>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setShowCustomForm(true)
+                         setIsRegistering(false)
+                         clearError()
+                       }}
+                       aria-label="Sign in with email"
+                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                     >
+                       <i className="fa-solid fa-envelope text-gray-500"></i>
+                       Sign in with email
+                     </button>
+                   </div>
 
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCustomForm(true)
-                        setIsRegistering(false)
-                        clearError()
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                    >
-                      <i className="fa-solid fa-user text-gray-500"></i>
-                      Sign in with username/password
-                    </button>
+                   <div className="relative my-3">
+                     <div className="absolute inset-0 flex items-center">
+                       <div className="w-full border-t border-gray-300" />
+                     </div>
+                     <div className="relative flex justify-center text-sm">
+                       <span className="px-2 bg-white text-gray-500">Or</span>
+                     </div>
+                   </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCustomForm(true)
-                        setIsRegistering(true)
-                        clearError()
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-white bg-red-500 border border-red-500 rounded-md hover:bg-red-600 shadow-lg shadow-red-500/50"
-                    >
-                      <i className="fa-solid fa-user-plus text-sm"></i>
-                      Create new account
-                    </button>
-                  </div>
+                   <div className="space-y-2">
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setShowCustomForm(true)
+                         setIsRegistering(true)
+                         clearError()
+                       }}
+                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                     >
+                       <i className="fa-solid fa-user-plus text-sm"></i>
+                       Create new account
+                     </button>
+                   </div>
+
+                   <div className="text-center">
+                     <p className="text-xs text-gray-500">
+                       Use your email and password.
+                     </p>
+                   </div>
                 </>
               ) : (
                 <form onSubmit={handleCustomSubmit} className="space-y-3">
