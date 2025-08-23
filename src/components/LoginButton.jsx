@@ -2,9 +2,19 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function LoginButton() {
-  const { loginWithGoogle, loginWithGithub, loading, error, clearError } = useAuth()
+  const { loginWithGoogle, loginWithGithub, login, register, loading, error, clearError } = useAuth()
   const [showDropdown, setShowDropdown] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState('right')
+  const [showCustomForm, setShowCustomForm] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    name: ''
+  })
+  const [validationErrors, setValidationErrors] = useState({})
   const buttonRef = useRef(null)
 
   const handleGoogleLogin = async (e) => {
@@ -19,6 +29,96 @@ export default function LoginButton() {
     clearError()
     setShowDropdown(false)
     await loginWithGithub()
+  }
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+    // Clear validation error when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }))
+    }
+  }
+
+  const validateForm = () => {
+    const errors = {}
+
+    if (isRegistering) {
+      if (!formData.username.trim()) {
+        errors.username = 'Username is required'
+      } else if (formData.username.length < 3) {
+        errors.username = 'Username must be at least 3 characters'
+      }
+
+      if (!formData.email.trim()) {
+        errors.email = 'Email is required'
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        errors.email = 'Please enter a valid email address'
+      }
+
+      if (!formData.name.trim()) {
+        errors.name = 'Name is required'
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match'
+      }
+    } else {
+      if (!formData.username.trim()) {
+        errors.username = 'Username or email is required'
+      }
+    }
+
+    if (!formData.password) {
+      errors.password = 'Password is required'
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters'
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleCustomSubmit = async (e) => {
+    e.preventDefault()
+    clearError()
+
+    if (!validateForm()) {
+      return
+    }
+
+    if (isRegistering) {
+      const userData = {
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        name: formData.name.trim()
+      }
+      const result = await register(userData)
+      if (result.success) {
+        setShowDropdown(false)
+        setShowCustomForm(false)
+        setIsRegistering(false)
+        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
+      }
+    } else {
+      const credentials = {
+        username: formData.username.trim(),
+        password: formData.password
+      }
+      const result = await login(credentials)
+      if (result.success) {
+        setShowDropdown(false)
+        setShowCustomForm(false)
+        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
+      }
+    }
   }
 
   const handleDropdownToggle = () => {
@@ -89,48 +189,245 @@ export default function LoginButton() {
                 </div>
               )}
               
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <i className="fa-brands fa-google text-red-500"></i>
-                  {loading ? 'Signing in...' : 'Continue with Google'}
-                </button>
+              {!showCustomForm ? (
+                <>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <i className="fa-brands fa-google text-red-500"></i>
+                      {loading ? 'Signing in...' : 'Continue with Google'}
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={handleGithubLogin}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <i className="fa-brands fa-github"></i>
-                  {loading ? 'Signing in...' : 'Continue with GitHub'}
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      onClick={handleGithubLogin}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <i className="fa-brands fa-github"></i>
+                      {loading ? 'Signing in...' : 'Continue with GitHub'}
+                    </button>
+                  </div>
 
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-500 text-center mb-2">
-                  Don't have an account?
-                </p>
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-white bg-red-500 border border-red-500 rounded-md hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/50"
-                >
-                  <i className="fa-solid fa-user-plus text-sm"></i>
-                  {loading ? 'Signing up...' : 'Sign Up'}
-                </button>
-              </div>
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">Or</span>
+                    </div>
+                  </div>
 
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-500 text-center">
-                  Log in or sign up to save your transcriptions
-                </p>
-              </div>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomForm(true)
+                        setIsRegistering(false)
+                        clearError()
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                    >
+                      <i className="fa-solid fa-user text-gray-500"></i>
+                      Sign in with username/password
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomForm(true)
+                        setIsRegistering(true)
+                        clearError()
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-white bg-red-500 border border-red-500 rounded-md hover:bg-red-600 shadow-lg shadow-red-500/50"
+                    >
+                      <i className="fa-solid fa-user-plus text-sm"></i>
+                      Create new account
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <form onSubmit={handleCustomSubmit} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-900">
+                      {isRegistering ? 'Create Account' : 'Sign In'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomForm(false)
+                        setIsRegistering(false)
+                        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
+                        setValidationErrors({})
+                        clearError()
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <i className="fa-solid fa-times"></i>
+                    </button>
+                  </div>
+
+                  {isRegistering && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Full Name
+                      </label>
+                      <input
+                        name="name"
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        className={`w-full px-2 py-1 text-sm border rounded ${
+                          validationErrors.name ? 'border-red-300' : 'border-gray-300'
+                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                        placeholder="Enter your full name"
+                      />
+                      {validationErrors.name && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.name}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {isRegistering && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Username
+                      </label>
+                      <input
+                        name="username"
+                        type="text"
+                        required
+                        value={formData.username}
+                        onChange={handleInputChange}
+                        className={`w-full px-2 py-1 text-sm border rounded ${
+                          validationErrors.username ? 'border-red-300' : 'border-gray-300'
+                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                        placeholder="Choose a username"
+                      />
+                      {validationErrors.username && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.username}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {isRegistering && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Email
+                      </label>
+                      <input
+                        name="email"
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className={`w-full px-2 py-1 text-sm border rounded ${
+                          validationErrors.email ? 'border-red-300' : 'border-gray-300'
+                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                        placeholder="Enter your email"
+                      />
+                      {validationErrors.email && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.email}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      {isRegistering ? 'Username or Email' : 'Username or Email'}
+                    </label>
+                    <input
+                      name="username"
+                      type="text"
+                      required
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      className={`w-full px-2 py-1 text-sm border rounded ${
+                        validationErrors.username ? 'border-red-300' : 'border-gray-300'
+                      } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                      placeholder={isRegistering ? "Choose a username" : "Enter username or email"}
+                    />
+                    {validationErrors.username && (
+                      <p className="text-xs text-red-600 mt-1">{validationErrors.username}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Password
+                    </label>
+                    <input
+                      name="password"
+                      type="password"
+                      required
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className={`w-full px-2 py-1 text-sm border rounded ${
+                        validationErrors.password ? 'border-red-300' : 'border-gray-300'
+                      } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                      placeholder="Enter your password"
+                    />
+                    {validationErrors.password && (
+                      <p className="text-xs text-red-600 mt-1">{validationErrors.password}</p>
+                    )}
+                  </div>
+
+                  {isRegistering && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Confirm Password
+                      </label>
+                      <input
+                        name="confirmPassword"
+                        type="password"
+                        required
+                        value={formData.confirmPassword}
+                        onChange={handleInputChange}
+                        className={`w-full px-2 py-1 text-sm border rounded ${
+                          validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                        placeholder="Confirm your password"
+                      />
+                      {validationErrors.confirmPassword && (
+                        <p className="text-xs text-red-600 mt-1">{validationErrors.confirmPassword}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-white bg-red-500 border border-red-500 rounded-md hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/50"
+                  >
+                    {loading ? (
+                      <i className="fa-solid fa-spinner animate-spin"></i>
+                    ) : (
+                      <i className="fa-solid fa-sign-in-alt"></i>
+                    )}
+                    {loading ? 'Processing...' : (isRegistering ? 'Create Account' : 'Sign In')}
+                  </button>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(!isRegistering)
+                        setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '' })
+                        setValidationErrors({})
+                        clearError()
+                      }}
+                      className="text-xs text-red-600 hover:text-red-500"
+                    >
+                      {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
 
