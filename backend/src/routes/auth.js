@@ -127,15 +127,13 @@ router.post('/login', async (req, res) => {
     if (!user) {
       console.log('Trying email search...');
       
-      // Find user by email case-insensitive and include password field
-      user = await prisma.user.findFirst({
-        where: {
-          email: {
-            equals: username,
-            mode: 'insensitive'
-          }
-        }
-      });
+      // Use raw SQL for guaranteed case-insensitive email search
+      const users = await prisma.$queryRaw`
+        SELECT * FROM users 
+        WHERE LOWER(email) = LOWER(${username})
+        LIMIT 1
+      `;
+      user = users[0] || null;
       
       console.log('User found by email (case-insensitive):', user ? 'Yes' : 'No');
       if (user) {
