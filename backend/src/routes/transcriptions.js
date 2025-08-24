@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { prisma } = require('../database');
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // Get all transcriptions for the authenticated user
-router.get('/', auth, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const transcriptions = await prisma.transcription.findMany({
       where: {
@@ -41,7 +41,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // Get a specific transcription by ID
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const transcription = await prisma.transcription.findFirst({
       where: {
@@ -71,7 +71,7 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // Create a new transcription
-router.post('/', auth, async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
       fileName,
@@ -109,7 +109,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // Update a transcription
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const transcription = await prisma.transcription.findFirst({
       where: {
@@ -146,7 +146,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // Delete a transcription
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const transcription = await prisma.transcription.findFirst({
       where: {
