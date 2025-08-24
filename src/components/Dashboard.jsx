@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import authService from '../utils/authService';
+import apiService from '../utils/apiService';
 
 export default function Dashboard({ onBackToTranscription }) {
   const { user } = useAuth();
@@ -21,18 +22,7 @@ export default function Dashboard({ onBackToTranscription }) {
     try {
       setLoading(true);
       const token = await authService.getToken();
-      const response = await fetch('/api/transcriptions', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch transcriptions');
-      }
-
-      const data = await response.json();
+      const data = await apiService.getTranscriptions(token);
       setTranscriptions(data.data || []);
     } catch (err) {
       setError(err.message);
@@ -45,18 +35,7 @@ export default function Dashboard({ onBackToTranscription }) {
     try {
       setDeletingId(id);
       const token = await authService.getToken();
-      const response = await fetch(`/api/transcriptions/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete transcription');
-      }
-
+      await apiService.deleteTranscription(id, token);
       setTranscriptions(transcriptions.filter(t => t.id !== id));
       setShowDeleteModal(false);
       setSelectedTranscription(null);

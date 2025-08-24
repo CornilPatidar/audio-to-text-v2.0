@@ -2,6 +2,7 @@ import React from 'react'
 import { useState, useRef, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import authService from './utils/authService'
+import apiService from './utils/apiService'
 import HomePage from './components/HomePage'
 import Header from './components/Header'
 import FileDisplay from './components/FileDisplay'
@@ -81,20 +82,8 @@ function AppContent() {
         }
       }
 
-      const response = await fetch('/api/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(transcriptionData)
-      })
-
-      if (response.ok) {
-        console.log('✅ Transcription saved to database')
-      } else {
-        console.error('❌ Failed to save transcription to database')
-      }
+      await apiService.createTranscription(transcriptionData, token)
+      console.log('✅ Transcription saved to database')
     } catch (error) {
       console.error('❌ Error saving transcription:', error)
     }
