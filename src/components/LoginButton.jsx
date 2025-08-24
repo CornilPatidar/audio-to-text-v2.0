@@ -190,15 +190,20 @@ export default function LoginButton() {
 
       {showDropdown && (
         <>
-                                                                                                                                   <div className={`absolute right-0 ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`} style={{
-                        width: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px',
-                        left: window.innerWidth < 640 ? '16px' : undefined,
-                        right: window.innerWidth < 640 ? '16px' : undefined,
-                        position: window.innerWidth < 640 ? 'fixed' : 'absolute',
-                        top: window.innerWidth < 640 ? '80px' : undefined,
-                        maxWidth: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px'
-                      }}>
-                                                     <div className="p-2 sm:p-3 max-h-[60vh] sm:max-h-[80vh] overflow-y-auto">
+                                                                                                                                   <div 
+            className={`absolute right-0 ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`} 
+            style={{
+              width: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px',
+              left: window.innerWidth < 640 ? '16px' : undefined,
+              right: window.innerWidth < 640 ? '16px' : undefined,
+              position: window.innerWidth < 640 ? 'fixed' : 'absolute',
+              top: window.innerWidth < 640 ? '80px' : undefined,
+              maxWidth: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <div className="p-2 sm:p-3 max-h-[60vh] sm:max-h-[80vh] overflow-y-auto">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs mb-3">
                   {error}
@@ -452,7 +457,8 @@ export default function LoginButton() {
                      </div>
                    )}
                    {isRegistering && validationErrors.acceptTerms && (
-                     <p className="text-xs text-red-600 mt-1">{validationErrors.acceptTerms}</p>
+                     <
+                      p className="text-xs text-red-600 mt-1">{validationErrors.acceptTerms}</p>
                    )}
 
                   <button
