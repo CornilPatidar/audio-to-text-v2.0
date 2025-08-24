@@ -264,8 +264,8 @@ export default function PrivacyPolicy() {
                                     If you have any questions about this Privacy Policy or our data practices, please contact us:
                                 </p>
                                 <div className="bg-gray-50 p-4 rounded-md">
-                                    <p><strong>Email:</strong> privacy@audiotextly.com</p>
-                                    <p><strong>Data Protection Officer:</strong> dpo@audiotextly.com</p>
+                                    <p><strong>Email:</strong> <a href="mailto:privacy@audiotextly.com" className="text-blue-600 hover:text-blue-800 underline">privacy@audiotextly.com</a></p>
+                                    <p><strong>Data Protection Officer:</strong> <a href="mailto:dpo@audiotextly.com" className="text-blue-600 hover:text-blue-800 underline">dpo@audiotextly.com</a></p>
                                     <p><strong>Address:</strong> [Your Business Address]</p>
                                     <p><strong>Phone:</strong> [Your Contact Number]</p>
                                 </div>
