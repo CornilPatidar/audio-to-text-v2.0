@@ -2,9 +2,7 @@
 CREATE TABLE "public"."users" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
-    "usernameCanonical" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "emailCanonical" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "name" TEXT,
     "avatarUrl" TEXT,
@@ -32,16 +30,10 @@ CREATE TABLE "public"."transcriptions" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_usernameCanonical_key" ON "public"."users"("usernameCanonical");
+CREATE UNIQUE INDEX "users_username_key" ON "public"."users"("username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_emailCanonical_key" ON "public"."users"("emailCanonical");
-
--- CreateIndex
-CREATE INDEX "users_usernameCanonical_idx" ON "public"."users"("usernameCanonical");
-
--- CreateIndex
-CREATE INDEX "users_emailCanonical_idx" ON "public"."users"("emailCanonical");
+CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
 
 -- AddForeignKey
 ALTER TABLE "public"."transcriptions" ADD CONSTRAINT "transcriptions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

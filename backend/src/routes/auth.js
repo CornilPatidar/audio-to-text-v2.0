@@ -40,12 +40,12 @@ router.post('/signup', async (req, res) => {
     const usernameClean = username.trim();
     const emailClean = email.trim();
 
-    // Check if user already exists (case-insensitive)
+    // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { usernameCanonical: usernameClean.toLowerCase() },
-          { emailCanonical: emailClean.toLowerCase() }
+          { username: usernameClean },
+          { email: emailClean }
         ]
       }
     });
@@ -53,7 +53,7 @@ router.post('/signup', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         error: 'User already exists',
-        message: existingUser.usernameCanonical === usernameClean.toLowerCase()
+        message: existingUser.username === usernameClean
           ? 'Username already taken' 
           : 'Email already registered'
       });
@@ -62,13 +62,11 @@ router.post('/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user with canonical fields
+    // Create user
     const user = await prisma.user.create({
       data: {
         username: usernameClean,
-        usernameCanonical: usernameClean.toLowerCase(),
         email: emailClean,
-        emailCanonical: emailClean.toLowerCase(),
         password: hashedPassword,
         name: name || null
       },
@@ -123,19 +121,19 @@ router.post('/login', async (req, res) => {
     
     console.log('Login attempt with:', identifier, 'Type:', isEmail ? 'Email' : 'Username');
     
-    // Find user by canonical fields (case-insensitive)
+    // Find user by email or username
     let user = await prisma.user.findFirst({
       where: isEmail
-        ? { emailCanonical: identifier.toLowerCase() }
-        : { usernameCanonical: identifier.toLowerCase() }
+        ? { email: identifier }
+        : { username: identifier }
     });
     
     // If not found, try the other field (email vs username)
     if (!user) {
       user = await prisma.user.findFirst({
         where: isEmail
-          ? { usernameCanonical: identifier.toLowerCase() }
-          : { emailCanonical: identifier.toLowerCase() }
+          ? { username: identifier }
+          : { email: identifier }
       });
     }
     

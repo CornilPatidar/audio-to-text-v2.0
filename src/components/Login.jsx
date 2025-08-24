@@ -61,8 +61,13 @@ export default function Login() {
       return
     }
 
+    // Convert to lowercase if it looks like an email, otherwise keep as-is
+    const identifier = formData.username.trim()
+    const isEmail = identifier.includes('@')
+    const processedIdentifier = isEmail ? identifier.toLowerCase() : identifier
+    
     const credentials = {
-      username: formData.username.trim(),
+      username: processedIdentifier,
       password: formData.password
     }
 

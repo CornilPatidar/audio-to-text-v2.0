@@ -104,7 +104,7 @@ export default function LoginButton() {
     if (isRegistering) {
       const userData = {
         username: formData.username.trim(),
-        email: formData.email.trim(),
+        email: formData.email.trim().toLowerCase(), // Convert email to lowercase
         password: formData.password,
         name: formData.name.trim()
       }
@@ -116,8 +116,13 @@ export default function LoginButton() {
          setFormData({ username: '', email: '', password: '', confirmPassword: '', name: '', acceptTerms: false })
        }
     } else {
+      // Convert to lowercase if it looks like an email, otherwise keep as-is
+      const identifier = formData.username.trim()
+      const isEmail = identifier.includes('@')
+      const processedIdentifier = isEmail ? identifier.toLowerCase() : identifier
+      
       const credentials = {
-        username: formData.username.trim(),
+        username: processedIdentifier,
         password: formData.password
       }
              const result = await login(credentials)

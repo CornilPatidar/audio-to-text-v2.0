@@ -74,7 +74,7 @@ export default function Register() {
 
     const userData = {
       username: formData.username.trim(),
-      email: formData.email.trim(),
+      email: formData.email.trim().toLowerCase(), // Convert email to lowercase
       password: formData.password,
       name: formData.name.trim()
     }
