@@ -6,6 +6,16 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Health check for auth router
+router.get('/health', (req, res) => {
+  res.json({ 
+    ok: true, 
+    scope: 'auth',
+    message: 'Auth router is working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Signup endpoint
 router.post('/signup', async (req, res) => {
   try {

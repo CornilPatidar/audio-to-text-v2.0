@@ -129,8 +129,10 @@ app.listen(PORT, async () => {
       console.log('✅ Database connection successful on startup!');
     } else {
       console.log('⚠️ Database connection failed on startup - some features may not work');
+      console.log('💡 Make sure DATABASE_URL environment variable is set correctly');
     }
   } catch (error) {
     console.log('⚠️ Database connection test failed on startup - some features may not work');
+    console.log('💡 Error details:', error.message);
   }
 });
