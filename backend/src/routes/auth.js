@@ -111,12 +111,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user by username or email
+    // Find user by username (case-sensitive) or email (case-insensitive)
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { username: username },
-          { email: username }
+          { username: username }, // Username is case-sensitive
+          { email: { equals: username, mode: 'insensitive' } } // Email is case-insensitive
         ]
       }
     });
