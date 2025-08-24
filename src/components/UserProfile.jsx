@@ -35,19 +35,19 @@ export default function UserProfile() {
         {user?.photoURL ? (
           <img
             src={user.photoURL}
-            alt={user.displayName || 'User'}
+            alt={user.name || user.username || 'User'}
             className="w-8 h-8 rounded-full border-2 border-gray-200"
           />
         ) : (
           <div className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center text-sm font-medium">
-            {getUserInitials(user?.displayName || user?.email)}
+            {getUserInitials(user?.name || user?.username || user?.email)}
           </div>
         )}
         <span className="hidden sm:block text-sm font-medium">
-          {user?.displayName || user?.email?.split('@')[0] || 'User'}
+          {user?.name || user?.username || user?.email?.split('@')[0] || 'User'}
         </span>
         <span className="sm:hidden text-sm font-medium">
-          {user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User'}
+          {user?.name?.split(' ')[0] || user?.username || user?.email?.split('@')[0] || 'User'}
         </span>
         <i className="fa-solid fa-chevron-down text-xs"></i>
       </button>
@@ -60,17 +60,17 @@ export default function UserProfile() {
                 {user?.photoURL ? (
                   <img
                     src={user.photoURL}
-                    alt={user.displayName || 'User'}
+                    alt={user.name || user.username || 'User'}
                     className="w-12 h-12 rounded-full border-2 border-gray-200"
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-red-500 text-white flex items-center justify-center text-lg font-medium">
-                    {getUserInitials(user?.displayName || user?.email)}
+                    {getUserInitials(user?.name || user?.username || user?.email)}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.displayName || 'User'}
+                    {user?.name || user?.username || 'User'}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
                     {user?.email}
