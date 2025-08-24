@@ -112,14 +112,37 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user by username (case-sensitive) or email (case-insensitive)
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { username: username }, // Username is case-sensitive
-          { email: { equals: username, mode: 'insensitive' } } // Email is case-insensitive
-        ]
-      }
+    let user = null;
+    
+    console.log('Login attempt with:', username);
+    
+    // First try to find by username (case-sensitive)
+    user = await prisma.user.findFirst({
+      where: { username: username }
     });
+    
+    console.log('User found by username:', user ? 'Yes' : 'No');
+    
+    // If not found by username, try by email (case-insensitive)
+    if (!user) {
+      // Try exact match first
+      user = await prisma.user.findFirst({
+        where: { email: username }
+      });
+      
+      // If still not found, try case-insensitive match
+      if (!user) {
+        user = await prisma.user.findFirst({
+          where: {
+            email: {
+              equals: username,
+              mode: 'insensitive'
+            }
+          }
+        });
+      }
+      console.log('User found by email:', user ? 'Yes' : 'No');
+    }
 
     if (!user) {
       return res.status(401).json({
