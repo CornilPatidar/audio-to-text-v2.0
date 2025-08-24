@@ -111,7 +111,7 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
@@ -121,4 +121,16 @@ app.listen(PORT, () => {
   console.log(`   - Signup: POST http://localhost:${PORT}/api/auth/signup`);
   console.log(`   - Login: POST http://localhost:${PORT}/api/auth/login`);
   console.log(`   - Profile: GET http://localhost:${PORT}/api/auth/profile`);
+  
+  // Test database connection on startup (but don't fail if it doesn't work)
+  try {
+    const isConnected = await testConnection();
+    if (isConnected) {
+      console.log('✅ Database connection successful on startup!');
+    } else {
+      console.log('⚠️ Database connection failed on startup - some features may not work');
+    }
+  } catch (error) {
+    console.log('⚠️ Database connection test failed on startup - some features may not work');
+  }
 });
