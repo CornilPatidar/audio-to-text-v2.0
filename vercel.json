@@ -7,8 +7,8 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://audiotextly-production.up.railway.app/api/:path*"
+      "source": "/api/(.*)",
+      "destination": "https://audiotextly-production.up.railway.app/api/$1"
     },
     {
       "source": "/(.*)",
@@ -26,15 +26,19 @@
       ]
     },
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "headers": [
         {
-          "key": "Cross-Origin-Embedder-Policy",
-          "value": "require-corp"
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
         },
         {
-          "key": "Cross-Origin-Opener-Policy", 
-          "value": "same-origin"
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, X-Requested-With"
         }
       ]
     }
