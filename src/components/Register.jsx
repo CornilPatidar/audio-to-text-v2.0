@@ -13,6 +13,8 @@ export default function Register() {
     name: ''
   })
   const [validationErrors, setValidationErrors] = useState({})
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -174,19 +176,28 @@ export default function Register() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={formData.password}
-                onChange={handleInputChange}
-                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                  validationErrors.password ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm`}
-                placeholder="Create a password"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`mt-1 appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                    validationErrors.password ? 'border-red-300' : 'border-gray-300'
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm`}
+                  placeholder="Create a password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                </button>
+              </div>
               {validationErrors.password && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
               )}
@@ -196,19 +207,28 @@ export default function Register() {
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                 Confirm Password
               </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                  validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm`}
-                placeholder="Confirm your password"
-              />
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className={`mt-1 appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                    validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm`}
+                  placeholder="Confirm your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  <i className={`fa-solid ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                </button>
+              </div>
               {validationErrors.confirmPassword && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.confirmPassword}</p>
               )}

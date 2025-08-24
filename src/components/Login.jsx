@@ -11,6 +11,7 @@ export default function Login() {
   })
   const [validationErrors, setValidationErrors] = useState({})
   const [showCustomLogin, setShowCustomLogin] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleGoogleLogin = async () => {
     clearError()
@@ -181,18 +182,27 @@ export default function Login() {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                    validationErrors.password ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm`}
-                  placeholder="Enter your password"
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={`mt-1 appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                      validationErrors.password ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm`}
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  >
+                    <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                  </button>
+                </div>
                 {validationErrors.password && (
                   <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
                 )}

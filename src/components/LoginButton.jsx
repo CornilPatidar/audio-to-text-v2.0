@@ -7,6 +7,8 @@ export default function LoginButton() {
   const [dropdownPosition, setDropdownPosition] = useState('right')
   const [showCustomForm, setShowCustomForm] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -416,17 +418,26 @@ export default function LoginButton() {
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Password
                     </label>
-                    <input
-                      name="password"
-                      type="password"
-                      required
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
-                        validationErrors.password ? 'border-red-300' : 'border-gray-300'
-                      } focus:outline-none focus:ring-1 focus:ring-red-500`}
-                      placeholder="Enter your password"
-                    />
+                    <div className="relative">
+                      <input
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        className={`w-full px-3 py-2 sm:px-2 sm:py-1 pr-10 text-sm border rounded ${
+                          validationErrors.password ? 'border-red-300' : 'border-gray-300'
+                        } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                        placeholder="Enter your password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                      >
+                        <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                      </button>
+                    </div>
                     {validationErrors.password && (
                       <p className="text-xs text-red-600 mt-1">{validationErrors.password}</p>
                     )}
@@ -437,17 +448,26 @@ export default function LoginButton() {
                        <label className="block text-xs font-medium text-gray-700 mb-1">
                          Confirm Password
                        </label>
-                       <input
-                         name="confirmPassword"
-                         type="password"
-                         required
-                         value={formData.confirmPassword}
-                         onChange={handleInputChange}
-                         className={`w-full px-3 py-2 sm:px-2 sm:py-1 text-sm border rounded ${
-                           validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                         } focus:outline-none focus:ring-1 focus:ring-red-500`}
-                         placeholder="Confirm your password"
-                       />
+                       <div className="relative">
+                         <input
+                           name="confirmPassword"
+                           type={showConfirmPassword ? "text" : "password"}
+                           required
+                           value={formData.confirmPassword}
+                           onChange={handleInputChange}
+                           className={`w-full px-3 py-2 sm:px-2 sm:py-1 pr-10 text-sm border rounded ${
+                             validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                           } focus:outline-none focus:ring-1 focus:ring-red-500`}
+                           placeholder="Confirm your password"
+                         />
+                         <button
+                           type="button"
+                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                           className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                         >
+                           <i className={`fa-solid ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                         </button>
+                       </div>
                        {validationErrors.confirmPassword && (
                          <p className="text-xs text-red-600 mt-1">{validationErrors.confirmPassword}</p>
                        )}
