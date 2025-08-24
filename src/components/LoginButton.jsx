@@ -138,6 +138,8 @@ export default function LoginButton() {
       
       if (isMobile) {
         setDropdownPosition('center')
+        // On mobile, always position at top center
+        document.body.classList.remove('dropdown-above')
       } else {
         // Desktop logic - updated to use 280px width
         const dropdownWidth = 280
@@ -149,14 +151,14 @@ export default function LoginButton() {
         } else {
           setDropdownPosition('right')
         }
-      }
-      
-      // Check vertical positioning
-      const dropdownHeight = isMobile ? 500 : 400
-      if (rect.bottom + dropdownHeight > windowHeight - 8) {
-        document.body.classList.add('dropdown-above')
-      } else {
-        document.body.classList.remove('dropdown-above')
+        
+        // Check vertical positioning for desktop only
+        const dropdownHeight = 400
+        if (rect.bottom + dropdownHeight > windowHeight - 8) {
+          document.body.classList.add('dropdown-above')
+        } else {
+          document.body.classList.remove('dropdown-above')
+        }
       }
     }
     
@@ -202,14 +204,11 @@ export default function LoginButton() {
       {showDropdown && (
         <>
                                                                                                                                    <div 
-            className={`absolute right-0 ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`} 
+            className={`${window.innerWidth < 640 ? 'fixed' : 'absolute'} ${window.innerWidth < 640 ? 'left-4 right-4' : 'right-0'} ${document.body.classList.contains('dropdown-above') ? 'bottom-full mb-2' : 'top-full mt-2'} bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden`} 
             style={{
-              width: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px',
-              left: window.innerWidth < 640 ? '16px' : undefined,
-              right: window.innerWidth < 640 ? '16px' : undefined,
-              position: 'absolute',
+              width: window.innerWidth < 640 ? 'auto' : '280px',
               top: window.innerWidth < 640 ? '80px' : undefined,
-              maxWidth: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px'
+              maxWidth: window.innerWidth < 640 ? 'none' : '280px'
             }}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
@@ -217,6 +216,10 @@ export default function LoginButton() {
           >
             <div 
               className="p-2 sm:p-3 max-h-[60vh] sm:max-h-[80vh] overflow-y-auto"
+              style={{
+                position: 'relative',
+                zIndex: 51
+              }}
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
