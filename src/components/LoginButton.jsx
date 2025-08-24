@@ -33,6 +33,7 @@ export default function LoginButton() {
   }
 
   const handleInputChange = (e) => {
+    console.log('Input change event:', e.target.name, e.target.value)
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -163,15 +164,25 @@ export default function LoginButton() {
   }
 
   useEffect(() => {
-    const handleResize = () => {
-      if (showDropdown) {
-        setShowDropdown(false)
-      }
-    }
+    // Temporarily disable resize handler to test if it's causing the issue
+    // let resizeTimeout;
+    // const handleResize = () => {
+    //   // Clear any existing timeout
+    //   clearTimeout(resizeTimeout);
+    //   
+    //   // Set a timeout to only close dropdown after a delay
+    //   // This prevents closing on virtual keyboard appearance
+    //   resizeTimeout = setTimeout(() => {
+    //     if (showDropdown) {
+    //       setShowDropdown(false)
+    //     }
+    //   }, 300); // 300ms delay
+    // }
 
-    window.addEventListener('resize', handleResize)
+    // window.addEventListener('resize', handleResize)
     return () => {
-      window.removeEventListener('resize', handleResize)
+      // window.removeEventListener('resize', handleResize)
+      // clearTimeout(resizeTimeout)
       document.body.classList.remove('dropdown-above')
     }
   }, [showDropdown])
@@ -196,14 +207,20 @@ export default function LoginButton() {
               width: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px',
               left: window.innerWidth < 640 ? '16px' : undefined,
               right: window.innerWidth < 640 ? '16px' : undefined,
-              position: window.innerWidth < 640 ? 'fixed' : 'absolute',
+              position: 'absolute',
               top: window.innerWidth < 640 ? '80px' : undefined,
               maxWidth: window.innerWidth < 640 ? `${window.innerWidth - 32}px` : '280px'
             }}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="p-2 sm:p-3 max-h-[60vh] sm:max-h-[80vh] overflow-y-auto">
+            <div 
+              className="p-2 sm:p-3 max-h-[60vh] sm:max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs mb-3">
                   {error}
@@ -493,12 +510,14 @@ export default function LoginButton() {
             </div>
           </div>
 
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowDropdown(false)}
-            onTouchStart={() => setShowDropdown(false)}
-          ></div>
+          {/* Backdrop - disabled for testing */}
+          {/* {window.innerWidth >= 640 && (
+            <div
+              className="fixed inset-0 z-30 bg-transparent"
+              onClick={() => setShowDropdown(false)}
+              onTouchStart={() => setShowDropdown(false)}
+            ></div>
+          )} */}
         </>
       )}
     </div>
