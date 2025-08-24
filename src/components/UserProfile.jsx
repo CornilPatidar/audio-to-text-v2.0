@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
-export default function UserProfile() {
+export default function UserProfile({ onShowDashboard }) {
   const { user, logout, loading } = useAuth()
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -94,7 +94,12 @@ export default function UserProfile() {
                   Settings
                 </button>
                 <button
-                  onClick={() => setShowDropdown(false)}
+                  onClick={() => {
+                    setShowDropdown(false);
+                    if (onShowDashboard) {
+                      onShowDashboard();
+                    }
+                  }}
                   className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center"
                 >
                   <i className="fa-solid fa-history mr-2"></i>

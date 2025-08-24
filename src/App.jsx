@@ -1,11 +1,13 @@
 import React from 'react'
 import { useState, useRef, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import authService from './utils/authService'
 import HomePage from './components/HomePage'
 import Header from './components/Header'
 import FileDisplay from './components/FileDisplay'
 import Information from './components/Information'
 import Transcribing from './components/Transcribing'
+import Dashboard from './components/Dashboard'
 import { MessageTypes } from './utils/presets'
 
 
@@ -24,12 +26,16 @@ function AppContent() {
     details: ''
   })
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
 
   const isAudioAvailable = file || audioStream
 
   function handleAudioReset() {
     setFile(null)
     setAudioStream(null)
+    setOutput(null)
+    setFinished(false)
+    setShowDashboard(false)
   }
 
   function handleCancelTranscription() {
@@ -51,6 +57,48 @@ function AppContent() {
   const worker = useRef(null)
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_REVAI_API_KEY || '')
   const [currentJobId, setCurrentJobId] = useState(null)
+
+  const saveTranscriptionToDatabase = async () => {
+    if (!output || !file) return
+    
+    try {
+      const token = await authService.getToken()
+      if (!token) {
+        console.log('⚠️ No auth token available, skipping database save')
+        return
+      }
+
+      const transcriptionData = {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        durationSeconds: Math.round(output.length * 0.5), // Approximate duration
+        transcriptionOutput: output,
+        metadata: {
+          model: 'whisper-tiny.en',
+          segments: output.length,
+          timestamp: new Date().toISOString()
+        }
+      }
+
+      const response = await fetch('/api/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(transcriptionData)
+      })
+
+      if (response.ok) {
+        console.log('✅ Transcription saved to database')
+      } else {
+        console.error('❌ Failed to save transcription to database')
+      }
+    } catch (error) {
+      console.error('❌ Error saving transcription:', error)
+    }
+  }
 
   useEffect(() => {
     // Create worker once and keep it alive
@@ -176,6 +224,11 @@ function AppContent() {
             details: 'Transcription successful'
           })
           console.log('🏁 Transcription completed!')
+          
+          // Save transcription to database if user is authenticated
+          if (user) {
+            saveTranscriptionToDatabase()
+          }
           break;
         case 'CANCELLED':
           setIsTranscribing(false)
@@ -313,8 +366,13 @@ function AppContent() {
   return (
     <div className='flex flex-col max-w-[1000px] mx-auto w-full'>
       <section className='min-h-screen flex flex-col'>
-        <Header />
-        {output ? (
+        <Header 
+          onShowDashboard={() => setShowDashboard(true)} 
+          onNewTranscription={handleAudioReset}
+        />
+        {showDashboard ? (
+          <Dashboard onBackToTranscription={() => setShowDashboard(false)} />
+        ) : output ? (
           <Information 
             output={output} 
             finished={finished}

@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { prisma, testConnection } = require('./database');
 const authRoutes = require('./routes/auth');
+const transcriptionRoutes = require('./routes/transcriptions');
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/transcriptions', transcriptionRoutes);
 
 // Test database connection on startup
 app.get('/api/db-test', async (req, res) => {
