@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { testFirebaseConfig } from '../utils/firebase'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -21,6 +22,12 @@ export default function Login() {
   const handleGithubLogin = async () => {
     clearError()
     await loginWithGithub()
+  }
+
+  const handleTestConfig = () => {
+    console.log('🧪 Testing Firebase configuration...')
+    const config = testFirebaseConfig()
+    console.log('📊 Config test result:', config)
   }
 
   const handleInputChange = (e) => {
@@ -158,6 +165,14 @@ export default function Login() {
                 className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-red-600 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 Sign in with username/password
+              </button>
+
+              {/* Debug button - remove this in production */}
+              <button
+                onClick={handleTestConfig}
+                className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                🧪 Test Firebase Config (Debug)
               </button>
             </div>
           ) : (

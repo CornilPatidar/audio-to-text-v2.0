@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
+const { auth: firebaseAuth } = require('../firebase-admin');
 
 const router = express.Router();
 
@@ -202,6 +203,58 @@ router.get('/profile', authenticateToken, async (req, res) => {
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to get profile'
+    });
+  }
+});
+
+// Generate Firebase custom token
+router.post('/firebase-token', authenticateToken, async (req, res) => {
+  try {
+    // Get user from database to ensure they exist
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        name: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'User does not exist'
+      });
+    }
+
+    // Create custom claims for the token
+    const customClaims = {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name
+    };
+
+    // Generate Firebase custom token
+    const customToken = await firebaseAuth.createCustomToken(user.id, customClaims);
+
+    res.json({
+      message: 'Firebase custom token generated successfully',
+      customToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+  } catch (error) {
+    console.error('Firebase token generation error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to generate Firebase token'
     });
   }
 });

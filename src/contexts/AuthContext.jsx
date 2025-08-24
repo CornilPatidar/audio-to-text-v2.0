@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { auth, onAuthStateChange, signInWithGoogle, signInWithGithub, signOutUser } from '../utils/firebase'
+import { auth, onAuthStateChange, signInWithGoogle, signInWithGithub, signInWithFacebook, signInWithApple, signInWithYahoo, signOutUser, signInWithCustomTokenAuth } from '../utils/firebase'
 import { getRedirectResult } from 'firebase/auth'
 import authService from '../utils/authService'
 
@@ -32,9 +32,24 @@ export const AuthProvider = ({ children }) => {
           const result = await authService.getProfile()
           if (result.success) {
             setUser(result.data.user)
+            
+            // Check for Firebase custom token and sign in
+            const firebaseCustomToken = localStorage.getItem('firebaseCustomToken')
+            if (firebaseCustomToken) {
+              console.log('🔐 Found Firebase custom token, signing in...')
+              const firebaseResult = await signInWithCustomTokenAuth(firebaseCustomToken)
+              if (firebaseResult.success) {
+                console.log('✅ Firebase custom token authentication successful')
+              } else {
+                console.log('⚠️ Firebase custom token authentication failed:', firebaseResult.error)
+                // Clear invalid token
+                localStorage.removeItem('firebaseCustomToken')
+              }
+            }
           } else {
             // Token is invalid, clear it
             authService.clearAuth()
+            localStorage.removeItem('firebaseCustomToken')
             setUser(null)
           }
         }
@@ -49,7 +64,7 @@ export const AuthProvider = ({ children }) => {
 
     const unsubscribe = onAuthStateChange((firebaseUser) => {
       console.log('Firebase auth state changed:', firebaseUser ? 'User logged in' : 'User logged out')
-      // Only update user if it's a Firebase user (OAuth)
+      // Update user if it's a Firebase user (OAuth or Custom Token)
       if (firebaseUser) {
         setUser(firebaseUser)
       }
@@ -77,6 +92,45 @@ export const AuthProvider = ({ children }) => {
     setLoading(true)
     setError(null)
     const result = await signInWithGithub()
+    
+    if (!result.success) {
+      setError(result.error)
+    }
+    
+    setLoading(false)
+    return result
+  }
+
+  const loginWithFacebook = async () => {
+    setLoading(true)
+    setError(null)
+    const result = await signInWithFacebook()
+    
+    if (!result.success) {
+      setError(result.error)
+    }
+    
+    setLoading(false)
+    return result
+  }
+
+  const loginWithApple = async () => {
+    setLoading(true)
+    setError(null)
+    const result = await signInWithApple()
+    
+    if (!result.success) {
+      setError(result.error)
+    }
+    
+    setLoading(false)
+    return result
+  }
+
+  const loginWithYahoo = async () => {
+    setLoading(true)
+    setError(null)
+    const result = await signInWithYahoo()
     
     if (!result.success) {
       setError(result.error)
@@ -143,6 +197,9 @@ export const AuthProvider = ({ children }) => {
     error,
     loginWithGoogle,
     loginWithGithub,
+    loginWithFacebook,
+    loginWithApple,
+    loginWithYahoo,
     register,
     login,
     logout,

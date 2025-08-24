@@ -73,6 +73,19 @@ class AuthService {
       // Store token and user data
       this.setAuth(data.token, data.user)
 
+      // Get Firebase custom token
+      const firebaseResponse = await fetch(`${API_BASE_URL}/auth/firebase-token`, {
+        method: 'POST',
+        headers: this.getAuthHeaders()
+      })
+
+      if (firebaseResponse.ok) {
+        const firebaseData = await firebaseResponse.json()
+        // Store Firebase custom token
+        localStorage.setItem('firebaseCustomToken', firebaseData.customToken)
+        return { success: true, data: { ...data, firebaseToken: firebaseData.customToken } }
+      }
+
       return { success: true, data }
     } catch (error) {
       return { success: false, error: error.message }
