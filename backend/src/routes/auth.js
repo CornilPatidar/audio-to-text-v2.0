@@ -36,12 +36,16 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Clean and validate input
+    const usernameClean = username.trim();
+    const emailClean = email.trim();
+
+    // Check if user already exists (case-insensitive)
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { username: username },
-          { email: email }
+          { usernameCanonical: usernameClean.toLowerCase() },
+          { emailCanonical: emailClean.toLowerCase() }
         ]
       }
     });
@@ -49,7 +53,7 @@ router.post('/signup', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         error: 'User already exists',
-        message: existingUser.username === username 
+        message: existingUser.usernameCanonical === usernameClean.toLowerCase()
           ? 'Username already taken' 
           : 'Email already registered'
       });
@@ -58,11 +62,13 @@ router.post('/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
+    // Create user with canonical fields
     const user = await prisma.user.create({
       data: {
-        username,
-        email,
+        username: usernameClean,
+        usernameCanonical: usernameClean.toLowerCase(),
+        email: emailClean,
+        emailCanonical: emailClean.toLowerCase(),
         password: hashedPassword,
         name: name || null
       },
@@ -111,35 +117,31 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user by username (case-sensitive) or email (case-insensitive)
-    let user = null;
+    // Clean input and determine search type
+    const identifier = (username || '').trim();
+    const isEmail = identifier.includes('@');
     
-    console.log('Login attempt with:', username);
+    console.log('Login attempt with:', identifier, 'Type:', isEmail ? 'Email' : 'Username');
     
-    // First try to find by username (case-sensitive)
-    user = await prisma.user.findFirst({
-      where: { username: username }
+    // Find user by canonical fields (case-insensitive)
+    let user = await prisma.user.findFirst({
+      where: isEmail
+        ? { emailCanonical: identifier.toLowerCase() }
+        : { usernameCanonical: identifier.toLowerCase() }
     });
     
-    console.log('User found by username:', user ? 'Yes' : 'No');
-    
-    // If not found by username, try by email (case-insensitive)
+    // If not found, try the other field (email vs username)
     if (!user) {
-      console.log('Trying email search...');
-      
-      // Use raw SQL for guaranteed case-insensitive email search
-      const users = await prisma.$queryRaw`
-        SELECT * FROM users 
-        WHERE LOWER(email) = LOWER(${username})
-        LIMIT 1
-      `;
-      user = users[0] || null;
-      
-      console.log('User found by email (case-insensitive):', user ? 'Yes' : 'No');
-      if (user) {
-        console.log('Found user email:', user.email);
-        console.log('Input email:', username);
-      }
+      user = await prisma.user.findFirst({
+        where: isEmail
+          ? { usernameCanonical: identifier.toLowerCase() }
+          : { emailCanonical: identifier.toLowerCase() }
+      });
+    }
+    
+    console.log('User found:', user ? 'Yes' : 'No');
+    if (user) {
+      console.log('Found user:', { username: user.username, email: user.email });
     }
 
     if (!user) {
