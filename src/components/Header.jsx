@@ -26,7 +26,7 @@ export default function Header({ onShowDashboard, onNewTranscription }) {
         <div className="flex items-center gap-2 sm:gap-4">
           <button 
             onClick={handleNewClick}
-            className='flex items-center gap-1 sm:gap-2 specialBtn px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-red-400 hover:text-red-500 transition-all duration-200 hover:-translate-y-0.5 text-xs sm:text-sm'
+            className='flex items-center gap-1 sm:gap-2 specialBtn px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200 hover:-translate-y-0.5 text-xs sm:text-sm'
           >
             <p>New</p>
             <i className="fa-solid fa-plus text-xs sm:text-sm"></i>
