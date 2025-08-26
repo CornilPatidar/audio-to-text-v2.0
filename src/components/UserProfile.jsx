@@ -13,7 +13,7 @@ const UserProfile = ({ onShowDashboard }) => {
 
   // Profile update form
   const [profileData, setProfileData] = useState({
-    name: user?.name || '',
+    name: user?.displayName || user?.name || '',
     email: user?.email || ''
   })
 
@@ -143,11 +143,11 @@ const UserProfile = ({ onShowDashboard }) => {
         onClick={() => setShowProfile(!showProfile)}
         className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
       >
-        <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-medium">
-          {user?.name?.charAt(0) || user?.username?.charAt(0) || 'U'}
-        </div>
+                      <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-medium">
+                {(user?.displayName || user?.name || user?.username)?.charAt(0) || 'U'}
+              </div>
         <span className="hidden sm:block text-sm font-medium">
-          {user?.name || user?.username || 'User'}
+          {user?.displayName || user?.name || user?.username || 'User'}
         </span>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -160,11 +160,11 @@ const UserProfile = ({ onShowDashboard }) => {
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white font-medium text-lg">
-                {user?.name?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                {(user?.displayName || user?.name || user?.username)?.charAt(0) || 'U'}
               </div>
               <div>
                 <h3 className="font-medium text-gray-900">
-                  {user?.name || user?.username || 'User'}
+                  {user?.displayName || user?.name || user?.username || 'User'}
                 </h3>
                 <p className="text-sm text-gray-500">{user?.email}</p>
               </div>
