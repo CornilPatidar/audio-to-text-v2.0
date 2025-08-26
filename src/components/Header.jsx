@@ -36,9 +36,9 @@ export default function Header({ onShowDashboard, onNewTranscription }) {
           ) : (
             <button
               onClick={() => setShowAuth(true)}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 hover:-translate-y-0.5 transition-all duration-200 font-medium specialBtn"
+              className="flex items-center gap-1 sm:gap-2 specialBtn px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-red-600 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200 hover:-translate-y-0.5 text-xs sm:text-sm"
             >
-              Log in
+              <p>Log in</p>
             </button>
           )}
         </div>
