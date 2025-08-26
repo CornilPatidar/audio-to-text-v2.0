@@ -65,4 +65,4 @@ npm run dev
 
 ---
 
-*Built with ❤️ using React and Rev AI's professional speech recognition service*
+*Built with ❤️ using React and Rev AI's professional speech recognition service.*
