@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { auth, onAuthStateChange, signInWithGoogle, signInWithGithub, signInWithFacebook, signInWithApple, signInWithYahoo, signOutUser, signInWithCustomTokenAuth } from '../utils/firebase'
+import { auth, onAuthStateChange, signInWithGoogle, signInWithApple, signOutUser, signInWithCustomTokenAuth } from '../utils/firebase'
 import { getRedirectResult } from 'firebase/auth'
 import authService from '../utils/authService'
 
@@ -88,31 +88,7 @@ export const AuthProvider = ({ children }) => {
     return result
   }
 
-  const loginWithGithub = async () => {
-    setLoading(true)
-    setError(null)
-    const result = await signInWithGithub()
-    
-    if (!result.success) {
-      setError(result.error)
-    }
-    
-    setLoading(false)
-    return result
-  }
 
-  const loginWithFacebook = async () => {
-    setLoading(true)
-    setError(null)
-    const result = await signInWithFacebook()
-    
-    if (!result.success) {
-      setError(result.error)
-    }
-    
-    setLoading(false)
-    return result
-  }
 
   const loginWithApple = async () => {
     setLoading(true)
@@ -127,18 +103,7 @@ export const AuthProvider = ({ children }) => {
     return result
   }
 
-  const loginWithYahoo = async () => {
-    setLoading(true)
-    setError(null)
-    const result = await signInWithYahoo()
-    
-    if (!result.success) {
-      setError(result.error)
-    }
-    
-    setLoading(false)
-    return result
-  }
+
 
   const register = async (userData) => {
     setLoading(true)
@@ -196,10 +161,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     loginWithGoogle,
-    loginWithGithub,
-    loginWithFacebook,
     loginWithApple,
-    loginWithYahoo,
     register,
     login,
     logout,
