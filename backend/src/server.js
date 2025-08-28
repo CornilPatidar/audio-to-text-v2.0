@@ -93,6 +93,24 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+// Test endpoint to verify transcriptions route loading
+app.get('/api/test-transcriptions-route', (req, res) => {
+  try {
+    const transcriptionRoutes = require('./routes/transcriptions');
+    res.json({
+      success: true,
+      message: 'Transcription routes module loaded successfully',
+      routes: transcriptionRoutes.stack ? transcriptionRoutes.stack.length : 'No stack info'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load transcription routes',
+      message: error.message
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
