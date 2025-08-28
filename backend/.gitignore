@@ -6,4 +6,4 @@ node_modules
 
 # Firebase Admin SDK service account key
 audio-to-text-26-firebase-adminsdk-fbsvc-4b967546f8.json
-*.json
+config/*.json

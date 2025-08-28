@@ -129,7 +129,7 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
@@ -153,4 +153,10 @@ app.listen(PORT, async () => {
     console.log('⚠️ Database connection test failed on startup - some features may not work');
     console.log('💡 Error details:', error.message);
   }
+}).on('error', (error) => {
+  console.error('❌ Server failed to start:', error.message);
+  if (error.code === 'EADDRINUSE') {
+    console.error('💡 Port is already in use. Please check if another process is using port', PORT);
+  }
+  process.exit(1);
 });
