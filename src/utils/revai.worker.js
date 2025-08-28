@@ -1,12 +1,10 @@
 import { MessageTypes } from './presets'
 
 // RevAI API Configuration
-// Use CORS proxy in production to avoid CORS issues
 const isDevelopment = import.meta.env.DEV
 const CORS_PROXY = 'https://corsproxy.io/?'
 
 const REVAI_CONFIG = {
-    // Use proxy in production, direct proxy in development
     BASE_URL: isDevelopment ? '/api/revai' : `${CORS_PROXY}https://api.rev.ai/speechtotext/v1`,
     POLL_INTERVAL: 2000, // 2 seconds
     MAX_POLL_ATTEMPTS: 150, // 5 minutes max
@@ -14,139 +12,93 @@ const REVAI_CONFIG = {
 }
 
 // State management for tracking transcription progress
-let currentJobId = null      // Current RevAI job ID being processed
-let pollInterval = null      // Interval timer for polling job status
-let pollAttempts = 0         // Counter for polling attempts
-let startTime = null         // When polling started
-let audioDuration = 0        // Duration of audio in seconds
+let currentJobId = null
+let pollInterval = null
+let pollAttempts = 0
+let startTime = null
+let audioDuration = 0
 
 /**
- * Calculate estimated progress based on time elapsed and audio duration
- * RevAI typically takes 1-3x the audio duration to process
+ * Get progress status message
  */
-function calculateEstimatedProgress() {
-    if (!startTime || !audioDuration) return 0.2
+function getProgressStatus() {
+    if (!startTime) return { message: 'Processing audio...', progress: 0.2 }
     
-    const elapsedSeconds = (Date.now() - startTime) / 1000
-    const estimatedTotalSeconds = audioDuration * 2.5 // RevAI typically takes 2.5x audio duration
-    
-    // Start at 20% (after upload) and go up to 90% max
-    const progress = Math.min(0.9, 0.2 + (elapsedSeconds / estimatedTotalSeconds) * 0.7)
-    return Math.max(0.2, progress)
-}
-
-/**
- * Get user-friendly status message based on progress
- */
-function getStatusMessage(attempt) {
     const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000)
-    
-    if (elapsedMinutes < 1) {
-        return 'Processing audio...'
-    } else if (elapsedMinutes < 2) {
-        return `Processing audio... (${elapsedMinutes} minute elapsed)`
-    } else {
-        return `Processing audio... (${elapsedMinutes} minutes elapsed)`
-    }
-}
-
-/**
- * Get detailed progress information
- */
-function getProgressDetails(attempt) {
     const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000)
     const estimatedTotalSeconds = audioDuration * 2.5
     const remainingSeconds = Math.max(0, estimatedTotalSeconds - elapsedSeconds)
     
+    let message = 'Processing audio...'
+    if (elapsedMinutes > 0) {
+        message += ` (${elapsedMinutes} minute${elapsedMinutes > 1 ? 's' : ''} elapsed)`
+    }
+    
     if (remainingSeconds > 60) {
         const remainingMinutes = Math.ceil(remainingSeconds / 60)
-        return `Estimated ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''} remaining`
-    } else {
-        return `Estimated ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''} remaining`
+        message += ` - Estimated ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''} remaining`
+    } else if (remainingSeconds > 0) {
+        message += ` - Estimated ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''} remaining`
     }
+    
+    // Simple progress calculation
+    const progress = Math.min(0.9, 0.2 + (elapsedSeconds / estimatedTotalSeconds) * 0.7)
+    return { message, progress: Math.max(0.2, progress) }
 }
 
 /**
  * Convert audio data to WAV file format for upload
- * RevAI requires audio files to be uploaded, so we convert the raw audio data
- * to a WAV file that can be sent via FormData
  */
 function audioDataToFile(audioData, fileName = 'audio.wav') {
-    // Audio format specifications for WAV file
-    const sampleRate = 16000      // 16kHz sample rate (RevAI requirement)
-    const numChannels = 1         // Mono audio
-    const bitsPerSample = 16      // 16-bit audio
+    const sampleRate = 16000
+    const numChannels = 1
+    const bitsPerSample = 16
     
-    // Calculate buffer size: 44 bytes for WAV header + 2 bytes per sample
     const buffer = new ArrayBuffer(44 + audioData.length * 2)
     const view = new DataView(buffer)
     
-    // Helper function to write strings to the buffer
     const writeString = (offset, string) => {
         for (let i = 0; i < string.length; i++) {
             view.setUint8(offset + i, string.charCodeAt(i))
         }
     }
     
-    // Write WAV file header (44 bytes)
-    writeString(0, 'RIFF')                                    // Chunk ID
-    view.setUint32(4, 36 + audioData.length * 2, true)       // File size
-    writeString(8, 'WAVE')                                    // Format
-    writeString(12, 'fmt ')                                   // Subchunk1 ID
-    view.setUint32(16, 16, true)                             // Subchunk1 size
-    view.setUint16(20, 1, true)                              // Audio format (PCM)
-    view.setUint16(22, numChannels, true)                    // Number of channels
-    view.setUint32(24, sampleRate, true)                     // Sample rate
-    view.setUint32(28, sampleRate * numChannels * bitsPerSample / 8, true)  // Byte rate
-    view.setUint16(32, numChannels * bitsPerSample / 8, true)               // Block align
-    view.setUint16(34, bitsPerSample, true)                  // Bits per sample
-    writeString(36, 'data')                                   // Subchunk2 ID
-    view.setUint32(40, audioData.length * 2, true)           // Subchunk2 size
+    // Write WAV file header
+    writeString(0, 'RIFF')
+    view.setUint32(4, 36 + audioData.length * 2, true)
+    writeString(8, 'WAVE')
+    writeString(12, 'fmt ')
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, numChannels, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * numChannels * bitsPerSample / 8, true)
+    view.setUint16(32, numChannels * bitsPerSample / 8, true)
+    view.setUint16(34, bitsPerSample, true)
+    writeString(36, 'data')
+    view.setUint32(40, audioData.length * 2, true)
     
     // Write audio data samples
     let offset = 44
     for (let i = 0; i < audioData.length; i++) {
-        // Clamp audio sample to [-1, 1] range and convert to 16-bit integer
         const sample = Math.max(-1, Math.min(1, audioData[i]))
         view.setInt16(offset, sample * 0x7FFF, true)
         offset += 2
     }
     
-    // Create and return a File object from the buffer
     return new File([buffer], fileName, { type: 'audio/wav' })
 }
 
 /**
  * Submit audio file to RevAI for transcription
- * This function uploads the audio file and returns a job ID for tracking
  */
 async function submitJob(audioFile, options = {}) {
     const { customVocabulary = [], rush = false, verbatim = false, humanTranscription = false, model = 'reverb' } = options
     
-    console.log(' [REVAI WORKER] Submitting job to:', `${REVAI_CONFIG.BASE_URL}/jobs`)
-    console.log(' [REVAI WORKER] API Key present:', !!REVAI_API_KEY)
-    console.log('🌍 [REVAI WORKER] Environment:', isDevelopment ? 'Development' : 'Production')
-    
-    if (customVocabulary.length > 0) {
-        console.log('📝 [REVAI WORKER] Custom vocabulary provided:', customVocabulary)
-    }
-    if (rush) {
-        console.log('⚡ [REVAI WORKER] Rush processing enabled')
-    }
-    if (verbatim) {
-        console.log('📝 [REVAI WORKER] Verbatim transcription enabled')
-    }
-    if (humanTranscription) {
-        console.log('👤 [REVAI WORKER] Human transcription enabled')
-    }
-    console.log('🤖 [REVAI WORKER] Model:', model)
-    
-    // Create FormData for file upload
     const formData = new FormData()
-    formData.append('media', audioFile)                       // Audio file
-    formData.append('metadata', 'Audio transcription from web app')  // Optional metadata
+    formData.append('media', audioFile)
+    formData.append('metadata', 'Audio transcription from web app')
     
-    // Add custom vocabulary if provided (correct Rev AI format)
     if (customVocabulary.length > 0) {
         const customVocabulariesArray = customVocabulary.map(phrase => ({
             phrase: phrase.trim()
@@ -154,7 +106,6 @@ async function submitJob(audioFile, options = {}) {
         formData.append('custom_vocabularies', JSON.stringify(customVocabulariesArray))
     }
     
-    // Add advanced options with correct Rev AI parameter names
     if (rush) {
         formData.append('rush', 'true')
     }
@@ -162,68 +113,47 @@ async function submitJob(audioFile, options = {}) {
         formData.append('verbatim', 'true')
     }
     
-    // Set transcriber based on model selection and human option
     if (humanTranscription) {
         formData.append('transcriber', 'human')
     } else if (model === 'reverb_turbo') {
-        formData.append('transcriber', 'low_cost')  // Reverb Turbo = low_cost
+        formData.append('transcriber', 'low_cost')
     } else {
-        formData.append('transcriber', 'machine')   // Reverb ASR = machine (default)
+        formData.append('transcriber', 'machine')
     }
     
     try {
-        // Prepare headers based on environment
         const headers = {
-            'Authorization': `Bearer ${REVAI_API_KEY}`    // API authentication
+            'Authorization': `Bearer ${REVAI_API_KEY}`
         }
         
-        // Send POST request to RevAI API
         const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs`, {
             method: 'POST',
             headers: headers,
             body: formData
         })
         
-        console.log('📡 [REVAI WORKER] Response status:', response.status)
-        
-        // Handle error responses
         if (!response.ok) {
-            const errorText = await response.text()
-            console.error('❌ [REVAI WORKER] Submit job failed:', errorText)
-            
-            // Provide specific error messages for common Rev AI issues
-            let errorMessage = `Failed to submit job: ${response.status}`
-            if (response.status === 400) {
-                errorMessage = 'Bad Request: Please check your file format and settings. Ensure file is a valid audio/video format.'
-            } else if (response.status === 401) {
-                errorMessage = 'Authorization failed: Please check your Rev AI API key.'
-            } else if (response.status === 403) {
-                errorMessage = 'Access forbidden: You do not have permission to use this service.'
+            let errorMessage = 'Failed to submit audio for transcription'
+            if (response.status === 401) {
+                errorMessage = 'Invalid API key'
             } else if (response.status === 413) {
-                errorMessage = 'File too large: Maximum size is 2GB for direct upload. Consider using source_config for larger files.'
+                errorMessage = 'Audio file is too large'
             } else if (response.status === 429) {
-                errorMessage = 'Rate limit exceeded: Please wait a moment and try again.'
-            } else {
-                errorMessage += ` - ${errorText}`
+                errorMessage = 'Too many requests, please try again later'
             }
-            
             throw new Error(errorMessage)
         }
         
-        // Parse successful response to get job ID
         const job = await response.json()
-        console.log('✅ [REVAI WORKER] Job submitted successfully:', job.id)
         return job.id
         
     } catch (error) {
-        console.error('❌ [REVAI WORKER] Submit job error:', error)
         throw error
     }
 }
 
 /**
  * Check the status of a RevAI transcription job
- * Returns job status information including completion status
  */
 async function checkJobStatus(jobId) {
     const headers = {
@@ -235,16 +165,11 @@ async function checkJobStatus(jobId) {
     })
     
     if (!response.ok) {
-        // Enhanced error handling based on Rev AI API documentation
-        let errorMessage = `Failed to check job status: ${response.status}`
+        let errorMessage = 'Failed to check transcription status'
         if (response.status === 401) {
-            errorMessage = 'Authorization failed: Please check your Rev AI API key.'
-        } else if (response.status === 403) {
-            errorMessage = 'Access forbidden: You do not have permission to access this job.'
+            errorMessage = 'Invalid API key'
         } else if (response.status === 404) {
-            errorMessage = 'Job not found: The transcription job may have been deleted or does not exist.'
-        } else {
-            errorMessage += ` - ${response.statusText}`
+            errorMessage = 'Transcription job not found'
         }
         throw new Error(errorMessage)
     }
@@ -254,12 +179,11 @@ async function checkJobStatus(jobId) {
 
 /**
  * Retrieve the completed transcript from RevAI
- * This is called once the job status is 'transcribed'
  */
 async function getTranscript(jobId) {
     const headers = {
         'Authorization': `Bearer ${REVAI_API_KEY}`,
-        'Accept': 'application/vnd.rev.transcript.v1.0+json'  // Request transcript format
+        'Accept': 'application/vnd.rev.transcript.v1.0+json'
     }
     
     const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs/${jobId}/transcript`, {
@@ -267,20 +191,13 @@ async function getTranscript(jobId) {
     })
     
     if (!response.ok) {
-        // Enhanced error handling based on Rev AI API documentation
-        let errorMessage = `Failed to get transcript: ${response.status}`
+        let errorMessage = 'Failed to get transcription results'
         if (response.status === 401) {
-            errorMessage = 'Authorization failed: Please check your Rev AI API key.'
-        } else if (response.status === 403) {
-            errorMessage = 'Access forbidden: You do not have permission to access this transcript.'
+            errorMessage = 'Invalid API key'
         } else if (response.status === 404) {
-            errorMessage = 'Transcript not found: Job may not exist or not be completed yet.'
-        } else if (response.status === 406) {
-            errorMessage = 'Invalid transcript format requested.'
+            errorMessage = 'Transcription not found'
         } else if (response.status === 409) {
-            errorMessage = 'Conflict: Job may still be in progress or failed.'
-        } else {
-            errorMessage += ` - ${response.statusText}`
+            errorMessage = 'Transcription is still processing'
         }
         throw new Error(errorMessage)
     }
@@ -290,12 +207,11 @@ async function getTranscript(jobId) {
 
 /**
  * Retrieve captions from RevAI in SRT or VTT format
- * This provides native caption output from Rev AI
  */
 async function getCaptions(jobId, format = 'srt') {
     const headers = {
         'Authorization': `Bearer ${REVAI_API_KEY}`,
-        'Accept': format === 'vtt' ? 'text/vtt' : 'application/x-subrip'  // SRT is default
+        'Accept': format === 'vtt' ? 'text/vtt' : 'application/x-subrip'
     }
     
     const response = await fetch(`${REVAI_CONFIG.BASE_URL}/jobs/${jobId}/captions`, {
@@ -303,22 +219,13 @@ async function getCaptions(jobId, format = 'srt') {
     })
     
     if (!response.ok) {
-        // Enhanced error handling based on Rev AI API documentation
-        let errorMessage = `Failed to get captions: ${response.status}`
+        let errorMessage = 'Failed to get captions'
         if (response.status === 401) {
-            errorMessage = 'Authorization failed: Please check your Rev AI API key.'
-        } else if (response.status === 403) {
-            errorMessage = 'Access forbidden: You do not have permission to access this deployment.'
+            errorMessage = 'Invalid API key'
         } else if (response.status === 404) {
-            errorMessage = 'Job not found: The transcription job may not exist.'
-        } else if (response.status === 405) {
-            errorMessage = 'Invalid job property: This job may not support captions.'
-        } else if (response.status === 406) {
-            errorMessage = 'Invalid caption format requested.'
+            errorMessage = 'Job not found'
         } else if (response.status === 409) {
-            errorMessage = 'Conflict: Job may still be in progress or failed.'
-        } else {
-            errorMessage += ` - ${response.statusText}`
+            errorMessage = 'Job is still processing'
         }
         throw new Error(errorMessage)
     }
@@ -372,46 +279,34 @@ function convertTranscript(revTranscript) {
 }
 
 /**
- * Start polling for job completion with improved progress tracking
+ * Start polling for job completion
  */
 async function startPolling(jobId) {
-    console.log('🔄 [REVAI WORKER] Starting polling for job:', jobId)
     currentJobId = jobId
     pollAttempts = 0
-    startTime = Date.now() // Record when polling started
+    startTime = Date.now()
     
     const poll = async () => {
         try {
             pollAttempts++
             
-            // Check for timeout (prevent infinite polling)
             if (pollAttempts > REVAI_CONFIG.MAX_POLL_ATTEMPTS) {
-                throw new Error('Job polling timeout - transcription took too long')
+                throw new Error('Transcription took too long')
             }
             
-            // Check current job status
             const jobStatus = await checkJobStatus(jobId)
-            console.log(' [REVAI WORKER] Job status:', jobStatus.status, `(attempt ${pollAttempts})`)
-            
-            // Calculate estimated progress and send update
-            const estimatedProgress = calculateEstimatedProgress()
-            const statusMessage = getStatusMessage(pollAttempts)
-            const progressDetails = getProgressDetails(pollAttempts)
+            const { message, progress } = getProgressStatus()
             
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'loading',
-                progress: estimatedProgress,
-                details: `${statusMessage} - ${progressDetails}`
+                progress: progress,
+                details: message
             })
             
-            // Handle different job statuses
             if (jobStatus.status === 'transcribed') {
-                // Job completed successfully - get transcript
                 clearInterval(pollInterval)
-                console.log('✅ [REVAI WORKER] Job completed, getting transcript...')
                 
-                // Send final progress update
                 self.postMessage({
                     type: MessageTypes.LOADING,
                     status: 'loading',
@@ -422,7 +317,6 @@ async function startPolling(jobId) {
                 const transcript = await getTranscript(jobId)
                 const results = convertTranscript(transcript)
                 
-                // Send results back to main thread
                 self.postMessage({
                     type: MessageTypes.RESULT,
                     results: results,
@@ -431,23 +325,18 @@ async function startPolling(jobId) {
                     jobId: jobId
                 })
                 
-                // Signal completion
                 self.postMessage({ 
                     type: MessageTypes.INFERENCE_DONE,
                     jobId: jobId
                 })
                 
             } else if (jobStatus.status === 'failed') {
-                // Job failed - report error
                 clearInterval(pollInterval)
                 throw new Error(`Transcription failed: ${jobStatus.failure_detail || 'Unknown error'}`)
             }
-            // Continue polling for 'in_progress' status
             
         } catch (error) {
-            // Handle polling errors
             clearInterval(pollInterval)
-            console.error('❌ [REVAI WORKER] Polling error:', error)
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'error',
@@ -456,54 +345,40 @@ async function startPolling(jobId) {
         }
     }
     
-    // Set up polling interval and start immediately
     pollInterval = setInterval(poll, REVAI_CONFIG.POLL_INTERVAL)
-    poll() // Start immediately
+    poll()
 }
 
 /**
- * Main transcription function with audio duration tracking
+ * Main transcription function
  */
 async function transcribe(audioData, options = {}) {
     const { customVocabulary = [], rush = false, verbatim = false, humanTranscription = false, model = 'reverb' } = options
     
     try {
-        console.log('🎯 [REVAI WORKER] Starting transcription process...')
-        
-        // Calculate audio duration for progress estimates
-        audioDuration = Math.round(audioData.length / 16000) // 16kHz sample rate
-        console.log('⏱️ [REVAI WORKER] Audio duration:', audioDuration, 'seconds')
-        
-        // Convert raw audio data to WAV file for upload
+        audioDuration = Math.round(audioData.length / 16000)
         const audioFile = audioDataToFile(audioData)
-        console.log('📁 [REVAI WORKER] Audio file created:', audioFile.name, audioFile.size, 'bytes')
         
-        // Send initial progress update
         self.postMessage({
             type: MessageTypes.LOADING,
             status: 'loading',
             progress: 0.1,
-            details: 'Uploading audio to Rev AI...'
+            details: 'Uploading audio...'
         })
         
-        // Submit job to RevAI and get job ID
         const jobId = await submitJob(audioFile, { customVocabulary, rush, verbatim, humanTranscription, model })
         
-        // Update progress after successful submission
         const processingTime = humanTranscription ? '12-24 hours' : `${Math.ceil(audioDuration * 2.5 / 60)} minutes`
         self.postMessage({
             type: MessageTypes.LOADING,
             status: 'loading',
             progress: 0.2,
-            details: `Job submitted successfully. Estimated processing time: ${processingTime}`
+            details: `Job submitted. Estimated time: ${processingTime}`
         })
         
-        // Start polling for completion
         startPolling(jobId)
         
     } catch (error) {
-        // Handle transcription errors
-        console.error('❌ [REVAI WORKER] Transcription error:', error.message)
         self.postMessage({
             type: MessageTypes.LOADING,
             status: 'error',
@@ -520,23 +395,19 @@ self.addEventListener('message', async (event) => {
     const { type, audio, apiKey, customVocabulary, rush, verbatim, humanTranscription, model, jobId, captionFormat } = event.data
 
     if (type === MessageTypes.INFERENCE_REQUEST) {
-        // Set API key
         if (apiKey) {
             REVAI_API_KEY = apiKey
-            console.log(' [REVAI WORKER] API key set:', apiKey.substring(0, 10) + '...')
         }
         
         if (!REVAI_API_KEY) {
-            console.error('❌ [REVAI WORKER] No API key provided')
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'error',
-                error: 'Rev AI API key not provided'
+                error: 'API key not provided'
             })
             return
         }
         
-        console.log('🎯 [REVAI WORKER] Starting transcription...')
         await transcribe(audio, { 
             customVocabulary: customVocabulary || [], 
             rush: rush || false, 
@@ -546,19 +417,16 @@ self.addEventListener('message', async (event) => {
         })
         
     } else if (type === MessageTypes.CAPTIONS_REQUEST) {
-        // Handle caption requests
         if (!REVAI_API_KEY) {
-            console.error('❌ [REVAI WORKER] No API key provided for captions')
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'error',
-                error: 'Rev AI API key not provided'
+                error: 'API key not provided'
             })
             return
         }
         
         if (!jobId) {
-            console.error('❌ [REVAI WORKER] No job ID provided for captions')
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'error',
@@ -568,7 +436,6 @@ self.addEventListener('message', async (event) => {
         }
         
         try {
-            console.log('🎯 [REVAI WORKER] Fetching captions...')
             const captions = await getCaptions(jobId, captionFormat || 'srt')
             
             self.postMessage({
@@ -579,7 +446,6 @@ self.addEventListener('message', async (event) => {
             })
             
         } catch (error) {
-            console.error('❌ [REVAI WORKER] Caption fetch error:', error.message)
             self.postMessage({
                 type: MessageTypes.LOADING,
                 status: 'error',
@@ -590,13 +456,11 @@ self.addEventListener('message', async (event) => {
     } else if (type === 'CANCEL_TRANSCRIPTION') {
         if (pollInterval) {
             clearInterval(pollInterval)
-            console.log('⏹️ [REVAI WORKER] Transcription cancelled')
         }
     } else if (type === 'DISPOSE') {
         if (pollInterval) {
             clearInterval(pollInterval)
         }
-        console.log('🗑️ [REVAI WORKER] Worker disposed')
     }
 })
 
