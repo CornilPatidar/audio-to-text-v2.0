@@ -272,4 +272,40 @@ export const testFirebaseConfig = () => {
   }
 }
 
+// Get JWT token from backend for Firebase users
+export const getJWTTokenForFirebaseUser = async (firebaseUser) => {
+  try {
+    console.log('🔐 Getting JWT token for Firebase user...')
+    
+    // Get Firebase ID token
+    const idToken = await firebaseUser.getIdToken()
+    
+    // Exchange Firebase ID token for JWT token
+    const response = await fetch(`${process.env.NODE_ENV === 'production' ? 'https://audiotextly-production.up.railway.app/api' : 'http://localhost:5000/api'}/auth/firebase-login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        idToken: idToken,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL
+      })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to get JWT token')
+    }
+
+    console.log('✅ JWT token obtained successfully')
+    return { success: true, data }
+  } catch (error) {
+    console.error('❌ Failed to get JWT token:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 export default app

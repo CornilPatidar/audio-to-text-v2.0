@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { auth, onAuthStateChange, signInWithGoogle, signInWithApple, signOutUser, signInWithCustomTokenAuth } from '../utils/firebase'
+import { auth, onAuthStateChange, signInWithGoogle, signInWithApple, signOutUser, signInWithCustomTokenAuth, getJWTTokenForFirebaseUser } from '../utils/firebase'
 import { getRedirectResult } from 'firebase/auth'
 import authService from '../utils/authService'
 
@@ -80,7 +80,17 @@ export const AuthProvider = ({ children }) => {
     setError(null)
     const result = await signInWithGoogle()
     
-    if (!result.success) {
+    if (result.success && result.user) {
+      // Get JWT token for backend API
+      const jwtResult = await getJWTTokenForFirebaseUser(result.user)
+      if (jwtResult.success) {
+        // Store JWT token and user data
+        authService.setAuth(jwtResult.data.token, jwtResult.data.user)
+        setUser(jwtResult.data.user)
+      } else {
+        setError('Failed to authenticate with backend: ' + jwtResult.error)
+      }
+    } else {
       setError(result.error)
     }
     
@@ -95,7 +105,17 @@ export const AuthProvider = ({ children }) => {
     setError(null)
     const result = await signInWithApple()
     
-    if (!result.success) {
+    if (result.success && result.user) {
+      // Get JWT token for backend API
+      const jwtResult = await getJWTTokenForFirebaseUser(result.user)
+      if (jwtResult.success) {
+        // Store JWT token and user data
+        authService.setAuth(jwtResult.data.token, jwtResult.data.user)
+        setUser(jwtResult.data.user)
+      } else {
+        setError('Failed to authenticate with backend: ' + jwtResult.error)
+      }
+    } else {
       setError(result.error)
     }
     

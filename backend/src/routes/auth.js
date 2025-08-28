@@ -103,45 +103,27 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// Login endpoint
+// Login user
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Validation
     if (!username || !password) {
       return res.status(400).json({
-        error: 'Missing required fields',
+        error: 'Missing credentials',
         message: 'Username/email and password are required'
       });
     }
 
-    // Clean input and determine search type
-    const identifier = (username || '').trim();
-    const isEmail = identifier.includes('@');
-    
-    console.log('Login attempt with:', identifier, 'Type:', isEmail ? 'Email' : 'Username');
-    
-    // Find user by email or username
-    let user = await prisma.user.findFirst({
-      where: isEmail
-        ? { email: identifier }
-        : { username: identifier }
+    // Find user by username or email
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: username.toLowerCase() },
+          { email: username.toLowerCase() }
+        ]
+      }
     });
-    
-    // If not found, try the other field (email vs username)
-    if (!user) {
-      user = await prisma.user.findFirst({
-        where: isEmail
-          ? { username: identifier }
-          : { email: identifier }
-      });
-    }
-    
-    console.log('User found:', user ? 'Yes' : 'No');
-    if (user) {
-      console.log('Found user:', { username: user.username, email: user.email });
-    }
 
     if (!user) {
       return res.status(401).json({
@@ -150,9 +132,16 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    // Check if user is a Firebase-only user
+    if (user.isFirebaseUser && !user.password) {
+      return res.status(401).json({
+        error: 'Firebase user',
+        message: 'This account was created with Google/Apple sign-in. Please use the OAuth buttons to sign in.'
+      });
+    }
 
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({
         error: 'Invalid credentials',
@@ -255,6 +244,79 @@ router.post('/firebase-token', authenticateToken, async (req, res) => {
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to generate Firebase token'
+    });
+  }
+});
+
+// Firebase login endpoint
+router.post('/firebase-login', async (req, res) => {
+  try {
+    const { idToken, email, displayName, photoURL } = req.body;
+
+    if (!idToken || !email) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'ID token and email are required'
+      });
+    }
+
+    // Verify Firebase ID token
+    const decodedToken = await firebaseAuth.verifyIdToken(idToken);
+    
+    if (decodedToken.email !== email) {
+      return res.status(401).json({
+        error: 'Invalid token',
+        message: 'Email mismatch'
+      });
+    }
+
+    // Check if user exists in database
+    let user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+
+    // If user doesn't exist, create them
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          username: email.split('@')[0], // Use email prefix as username
+          name: displayName || email.split('@')[0],
+          avatarUrl: photoURL || null,
+          password: null, // Firebase users don't have passwords
+          isFirebaseUser: true
+        }
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Return user data (without password)
+    const userData = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt
+    };
+
+    res.json({
+      message: 'Firebase login successful',
+      user: userData,
+      token
+    });
+
+  } catch (error) {
+    console.error('Firebase login error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to authenticate with Firebase'
     });
   }
 });

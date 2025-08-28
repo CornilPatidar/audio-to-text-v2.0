@@ -11,6 +11,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+console.log('🔧 Environment variables:');
+console.log('   - PORT:', process.env.PORT || 'not set (using default 5000)');
+console.log('   - NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('   - DATABASE_URL:', process.env.DATABASE_URL ? 'set' : 'not set');
+console.log('🚀 Starting server on port:', PORT);
+
 // CORS configuration
 const corsOptions = {
   origin: [
@@ -153,10 +159,4 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.log('⚠️ Database connection test failed on startup - some features may not work');
     console.log('💡 Error details:', error.message);
   }
-}).on('error', (error) => {
-  console.error('❌ Server failed to start:', error.message);
-  if (error.code === 'EADDRINUSE') {
-    console.error('💡 Port is already in use. Please check if another process is using port', PORT);
-  }
-  process.exit(1);
 });
