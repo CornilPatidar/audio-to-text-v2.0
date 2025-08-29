@@ -1,8 +1,8 @@
-import logo from "../assets/logo.png"
+import logo from "../../assets/logo.png"
 import { useAuth } from "../../contexts/AuthContext"
 import UserProfile from "../features/UserProfile"
-import LoginButton from "./LoginButton"
-import EnhancedAuth from "./EnhancedAuth"
+import LoginButton from "../auth/LoginButton"
+import EnhancedAuth from "../auth/EnhancedAuth"
 import { useState } from "react"
 
 export default function Header({ onShowDashboard, onNewTranscription }) {
