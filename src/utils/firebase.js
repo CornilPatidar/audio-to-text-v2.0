@@ -281,7 +281,7 @@ export const getJWTTokenForFirebaseUser = async (firebaseUser) => {
     const idToken = await firebaseUser.getIdToken()
     
     // Exchange Firebase ID token for JWT token
-    const response = await fetch(`${process.env.NODE_ENV === 'production' ? 'https://audiotextly-production.up.railway.app/api' : 'http://localhost:5000/api'}/auth/firebase-token`, {
+    const response = await fetch(`${process.env.NODE_ENV === 'production' ? 'https://audiotextly-production.up.railway.app/api' : 'http://localhost:5000/api'}/auth/firebase-login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
