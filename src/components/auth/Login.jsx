@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { testFirebaseConfig } from '../utils/firebase'
+import { useAuth } from '../../contexts/AuthContext'
+import { testFirebaseConfig } from '../../utils/firebase'
 
 export default function Login() {
   const navigate = useNavigate()

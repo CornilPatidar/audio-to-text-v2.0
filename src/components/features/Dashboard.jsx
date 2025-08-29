@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import authService from '../utils/authService';
-import apiService from '../utils/apiService';
+import { useAuth } from '../../contexts/AuthContext';
+import authService from '../../utils/authService';
+import apiService from '../../utils/apiService';
 
 export default function Dashboard({ onBackToTranscription }) {
   const { user } = useAuth();

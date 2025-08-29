@@ -1,6 +1,6 @@
 import React from 'react'
 import Transcription from './Transcription'
-import ExportOptions from './ExportOptions'
+import ExportOptions from '../features/ExportOptions'
 
 export default function Information(props) {
     const { output, finished, jobId, worker, apiKey } = props

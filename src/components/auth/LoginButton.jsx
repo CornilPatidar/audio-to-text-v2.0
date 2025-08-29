@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function LoginButton() {
   const { loginWithGoogle, loginWithGithub, login, register, loading, error, clearError } = useAuth()

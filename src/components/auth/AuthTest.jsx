@@ -1,5 +1,5 @@
 import React from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function AuthTest() {
   const { user, isAuthenticated, loading, error } = useAuth()

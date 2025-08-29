@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import authService from '../utils/authService'
+import { useAuth } from '../../contexts/AuthContext'
+import authService from '../../utils/authService'
 
 const UserProfile = ({ onShowDashboard }) => {
   const { user, logout } = useAuth()

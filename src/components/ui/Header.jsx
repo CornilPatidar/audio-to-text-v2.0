@@ -1,6 +1,6 @@
 import logo from "../assets/logo.png"
-import { useAuth } from "../contexts/AuthContext"
-import UserProfile from "./UserProfile"
+import { useAuth } from "../../contexts/AuthContext"
+import UserProfile from "../features/UserProfile"
 import LoginButton from "./LoginButton"
 import EnhancedAuth from "./EnhancedAuth"
 import { useState } from "react"

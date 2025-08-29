@@ -8,7 +8,7 @@ import {
     exportAsPDF,
     getMimeType,
     generateFilename
-} from '../utils/exportFormats'
+} from '../../utils/exportFormats'
 
 export default function ExportOptions({ segments, onExport, jobId, worker, apiKey }) {
     const [isOpen, setIsOpen] = useState(false)
